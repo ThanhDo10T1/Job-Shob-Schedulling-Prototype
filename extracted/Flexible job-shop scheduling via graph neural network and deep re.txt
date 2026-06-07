@@ -1,0 +1,923 @@
+
+--- PAGE 1 ---
+SSiinnggaappoorree MMaannaaggeemmeenntt UUnniivveerrssiittyy
+IInnssttiittuuttiioonnaall KKnnoowwlleeddggee aatt SSiinnggaappoorree MMaannaaggeemmeenntt UUnniivveerrssiittyy
+Research Collection School Of Computing and
+School of Computing and Information Systems
+Information Systems
+2-2023
+FFlleexxiibbllee jjoobb--sshhoopp sscchheedduulliinngg vviiaa ggrraapphh nneeuurraall nneettwwoorrkk aanndd ddeeeepp
+rreeiinnffoorrcceemmeenntt lleeaarrnniinngg
+Wen SONG
+Xinyang CHEN
+Qiqiang LI
+Zhiguang CAO
+Singapore Management University, zgcao@smu.edu.sg
+Follow this and additional works at: https://ink.library.smu.edu.sg/sis_research
+Part of the Databases and Information Systems Commons
+CCiittaattiioonn
+SONG, Wen; CHEN, Xinyang; LI, Qiqiang; and CAO, Zhiguang. Flexible job-shop scheduling via graph neural
+network and deep reinforcement learning. (2023). IEEE Transactions on Industrial Informatics. 19, (2),
+1600-1610.
+AAvvaaiillaabbllee aatt:: https://ink.library.smu.edu.sg/sis_research/8197
+This Journal Article is brought to you for free and open access by the School of Computing and Information
+Systems at Institutional Knowledge at Singapore Management University. It has been accepted for inclusion in
+Research Collection School Of Computing and Information Systems by an authorized administrator of Institutional
+Knowledge at Singapore Management University. For more information, please email cherylds@smu.edu.sg.
+
+--- PAGE 2 ---
+This article has been accepted for publication in IEEE Transactions on Industrial Informatics. This is the author's version which has not been fully edited and
+content may change prior to final publication. Citation information: DOI 10.1109/TII.2022.3189725
+IEEETRANSACTIONSONINDUSTRIALINFORMATICS 1
+Flexible Job Shop Scheduling via Graph Neural
+Network and Deep Reinforcement Learning
+Wen Song, Xinyang Chen, Qiqiang Li, and Zhiguang Cao
+Abstract—Recently, Deep Reinforcement Learning (DRL) has of the scheduling problem required to be solved is often
+been applied to learn priority dispatching rules (PDRs) for large, due to the large volume of involved demands and
+solving complex scheduling problems. However, existing works
+resources. Therefore, scheduling algorithms and systems for
+face challenges in dealing with flexibility, which allows an
+cloudmanufacturingshouldbefastandadaptiveinresponding
+operation to be scheduled on one out of multiple machines
+and is often required in practice. Such one-to-many relationship to the scheduling requests, and must be able to cope with
+brings additional complexity in both decision-making and state manufacturing flexibility and large-scale problems, which is
+representation. This paper considers the well-known Flexible challenging to design and develop.
+Job-shopSchedulingProblem(FJSP),andaddressestheseissues
+This paper focuses on the Flexible Job-shop Scheduling
+by proposing a novel DRL method to learn high-quality PDRs
+Problem (FJSP), a well-known generalization of the Job-
+end-to-end. The operation selection and machine assignment
+are combined as a composite decision. Moreover, based on a shop Scheduling Problem (JSP) with wide applications in
+novel heterogeneous graph representation of scheduling states, cloud manufacturing [4], [5]. Different from JSP, FJSP al-
+a Heterogeneous Graph Neural Network based architecture is lows operations to be processed on any machine from a set
+proposed to capture complex relationships among operations
+of alternative ones, hence is more suitable in handling the
+and machines. Experiments show that the proposed method
+flexibility and diversity of the task-resource relations in new
+outperforms traditional PDRs and is computationally efficient,
+evenoninstancesoflargerscalesanddifferentpropertiesunseen manufacturing paradigms such as cloud manufacturing [6].
+in training. Due to its important application value, FJSP receives much
+attention in the literature [6], [7].
+Index Terms—Flexible Job-shop Scheduling, Graph Neural
+Network, Deep Reinforcement Learning. FJSP is well-known to be NP-hard since it is harder than
+JSP,whichisalreadystronglyNP-hard,duetotherequirement
+of machine assignment decisions [6]–[8]. Therefore, exact
+I. INTRODUCTION
+methods such as mathematical programming and constraint
+CLOUD manufacturing, as an emerging paradigm of next programming often suffer from prohibitively long computa-
+generation manufacturing systems in the age of Industry tionaltime,especiallyinsolvinglarge-sizedproblems.Inprac-
+4.0, has received much attention in the past decade [1]. It tice, heuristics methods are often employed which sacrifice
+virtualizes and integrates distributed manufacturing resources optimality for efficiency. Priority dispatching rule (PDR) is
+intoacommoncloudplatform,soastoprovideflexible,high- a well-known and practical heuristic scheduling method. It
+quality and on-demand manufacturing services, supported solvestheschedulingprobleminaconstructivefashion,which
+by advanced technologies such as Cyber-Physical Systems iterativelydispatchesjobsto machines basedonsomepriority
+(CPS), Logistic Internet-of-Things (LIoT) [2], and Artificial rules (e.g. First In First Out, FIFO) [9]. Meta-heuristics, such
+Intelligence (AI). To unleash its full potential, effective re- as evolutionary algorithms, form another popular paradigm
+source scheduling is a critical factor for cloud manufacturing of heuristics, which have also received much attention. They
+systems [3]. Its main task is to schedule the manufacturing employ complicated search procedures to explore the solution
+demands (jobs) onto the manufacturing resources (machines), space to find high-quality solutions [6]. Compared to meta-
+so as to achieve the optimal system performance. However, heuristics,PDRsareintuitive,easytoimplementationandvery
+different from traditional production, resource scheduling for fastincomputation,makingitmorepreferableindealingwith
+cloud manufacturing is much more complicated. Its cloud- problems in cloud manufacturing, which are often large-scale
+based open environment makes manufacturing scheduling and even dynamic [10].
+much more diverse, flexible and dynamic. Moreover, scale While PDRs have been widely applied in practice, their
+scheduling quality is still quite far from optimality. This
+This work is supported by the National Natural Science Foundation of could result from the following reasons. First, the construc-
+China under Grant 62102228, and the Shandong Provincial Natural Science
+tion process is greedy based on the priority measure, which
+FoundationunderGrantZR2021QF063.(Correspondingauthor:QiqiangLi.)
+WenSongandXinyangChencontributedequally. could be myopic. Second, the decisions are based mostly
+Wen Song is with the Institute of Marince Science and Tech- on information from the eligible jobs and machines at each
+nology, Shandong University, Qingdao 266237, China (e-mail: wen-
+step, while the global information is largely ignored. Finally,
+song@email.sdu.edu.cn).
+Xinyang Chen and Qiqiang Li are with the School of Control Sci- currentPDRsaremainlydesignedbasedonhumanexperience,
+ence and Engineering, Shandong University, Jinan 250061, China (e-mail: which usually have no guarantee on the optimality and lack
+chenxy19@mail.sdu.edu.cn,qqli@sdu.edu.cn).
+the ability of adapting to specific problems and situations. In
+Zhiguang Cao is with Singapore Institute of Manufacturing Technology
+(SIMTech),Singapore138634(email:zhiguangcao@outlook.com). the age of Industry 4.0, however, the development of new
+© 2022 IEEE. Personal use is permitted, but republication/redistribution requires IEEE permission.(cid:13)(cid:10)See https://www.ieee.org/publications/rights/index.html for more information.
+Authorized licensed use limited to: ASTAR. Downloaded on July 12,2022 at 01:32:57 UTC from IEEE Xplore. Restrictions apply.
+
+--- PAGE 3 ---
+This article has been accepted for publication in IEEE Transactions on Industrial Informatics. This is the author's version which has not been fully edited and
+content may change prior to final publication. Citation information: DOI 10.1109/TII.2022.3189725
+IEEETRANSACTIONSONINDUSTRIALINFORMATICS 2
+usingProximalPolicyOptimization(PPO).Differentfromthe
+GNNs used in existing DRL based scheduling methods (e.g.
+[13], [14], [18]), the GNN proposed in this paper works on
+heterogeneousgraphsspecializedforFJSP,whichcapturesthe
+statusfornotonlyoperations,butalsomachinesandoperation-
+machine relationships. Extensive experiments are conducted
+on synthetic instances and public benchmarks. Results show
+that while maintaining high computational efficiency, the pro-
+posed method can outperform traditional hand-crafted PDRs,
+Fig. 1: Conceptual architecture of the DRL based method
+and effectively generalize to larger-sized problems and public
+benchmarks unseen in training.
+Besides the methodological novelty, the proposed method
+technologies provides new impetus to overcome these limi- also has good practical value. Its neural architecture is size-
+tations. In particular, large amounts of historical/simulation agnostic, hence the trained policy can be applied to solve
+data about the frequently solved scheduling problem is much instances of varying sizes, not only the training size. More
+easier to obtain, from which advanced AI algorithms such importantly, the trained policy can rapidly solve large-scale
+as Deep Reinforcement Learning (DRL) can be utilized to FJSP instances, and deliver reasonably good schedules better
+discover better patterns for solving scheduling problem (con- than traditional PDRs, making it a good choice for the man-
+ceptual architecture is shown in Fig. 1). In this direction, a agement staff to optimize the production resource usage.
+number of recent works attempt to automatically generate Tosummarize,thispapermakesthefollowingcontributions:
+PDRs for scheduling problems using DRL in an end-to-end
+• An end-to-end DRL method to solve FJSP, which can
+fashion [11]–[16]. By viewing the decision making of PDRs
+train size-agnostic policies that outperform traditional
+as an Markov Decision Process (MDP), they train scheduling
+hand-crafted PDRs while maintaining high efficiency.
+policies that take the future into account, so as to alleviate the
+• AnMDPformulationwithanintegrateddecision-making
+myopic nature of PDRs. They employ deep neural networks
+approach, which combines the operation selection and
+to capture the global scheduling status instead of only local
+machine assignment decisions as one decision.
+information. Furthermore, the reinforcement training process
+• A heterogeneous graph structure for state representation,
+is guided by the cumulative reward towards the direction of
+whicheffectivelyintegratesoperationandmachineinfor-
+optimizing performance, which is fully automatic without the
+mation with relatively low graph density.
+need of human intervention [17].
+• A Heterogeneous GNN based neural architecture, which
+Despite the promising results, most existing DRL methods extracts rich information from the heterogeneous state
+onlyfocusonnon-flexibleproblemssuchasJSP.Theexistence graph for high-quality scheduling decision making.
+offlexibilityimposestwomajorchallengesonthedesignofef-
+The rest content is organized as follows. Section II reviews
+fective learning mechanism. First, decisions in FJSP are more
+recent DRL based scheduling methods. Section III describes
+complicatedwithnotonlyoperationselectionbutalsomachine
+FJSP and its graph representation. Section IV introduces the
+assignment. Second, the scheduling status could be much
+proposed method in detail. Section V provides experimental
+harder to encode using neural network, due to the complex
+results and analysis. Section VI concludes the paper.
+one-to-many relationships between operations and machines.
+Consequently, more complex decision-making framework and
+II. RELATEDWORKS
+moreinformativerepresentationtechniquesarenecessary.The
+In this section, we briefly review conventional FJSP meth-
+keyresearchquestionsare:1)howtoformulatethescheduling
+ods, and the recent DRL based scheduling methods.
+process so as to incorporate machine assignment, and 2) how
+to design the representation scheme and neural architecture to
+extract useful information from raw scheduling states. A. Conventional FJSP Methods
+To address the above challenges, this paper proposes a Conventional methods for solving FJSP can be classified
+novel end-to-end DRL method to learn high-quality PDRs for into exact methods, heuristics and meta-heuristics [7]. Typical
+solving FJSP. For research question1), this paper proposes an exact methods are mixed integer linear programming [19] and
+MDP formulation for PDR based FJSP scheduling, where an constraint programming [20]. They have theoretical guarantee
+actionistoselectaneligibleoperation-machinepair,suchthat of finding the optimal schedule, but requires exponentially
+boththeoperationselectionandmachineassignmentdecisions long computational time. Heuristics are developed based on
+can be made at the same time. For research question 2), by expert knowledge, which do not possess optimality guarantee
+extending disjunctive graph of FJSP with machine nodes, this but are considerably faster than exact methods. Typical FJSP
+paper proposes a novel heterogeneous graph structure to rep- heuristics include PDR [21], A* [22], local search [23], etc.
+resenttheMDPstates,suchthatthecomplicatedrelationships Meta-heuristics can be further classified into single solution-
+among operations and machines can be captured. Moreover, based (e.g. simulated annealing [24], tabu search [25]) and
+a two-stage Graph Neural Network (GNN) is proposed to population-based (e.g. genetic algorithm [26], [27]) methods,
+obtain feature embeddings of the nodes in the heterogeneous which works on a single solution or a pool of solutions,
+graph,basedonwhichapolicynetworkisdesignedandtrained respectively.CompletereviewsofFJSPmethodscanbefound
+© 2022 IEEE. Personal use is permitted, but republication/redistribution requires IEEE permission.(cid:13)(cid:10)See https://www.ieee.org/publications/rights/index.html for more information.
+Authorized licensed use limited to: ASTAR. Downloaded on July 12,2022 at 01:32:57 UTC from IEEE Xplore. Restrictions apply.
+
+--- PAGE 4 ---
+This article has been accepted for publication in IEEE Transactions on Industrial Informatics. This is the author's version which has not been fully edited and
+content may change prior to final publication. Citation information: DOI 10.1109/TII.2022.3189725
+IEEETRANSACTIONSONINDUSTRIALINFORMATICS 3
+in[6],[7].ThispaperfocusesonPDRs,whicharewidelyused
+inpracticalproductionsystemsduetoitseasyimplementation
+and fast computation. The aim is to discover high-quality
+PDRsusingDRL,andtherelevantworksarediscussedbelow.
+B. DRL based Scheduling Methods
+(a)Aninstance (b)Asolution
+Recently, quite a few works employ DRL to solve complex Fig. 2: Disjunctive graph of FJSP. Dotted line means process-
+scheduling problems. A key issue in DRL based scheduling able, while solid line means scheduled.
+is state representation. For JSP, some researchers use vectors
+or matrices to represent states, and use Multilayer Perceptron
+(MLP)[10],[12],[28],[29]orConvolutionalNeuralNetwork III. PRELIMINARIES
+(CNN) [11] to extract state features. A major limitation of
+such representation is that it is hard bounded by fixed matrix An FJSP instance of size n×m includes n jobs and m
+dimensions, and cannot solve problems of different sizes. A machines,formingtwosetsJ andM.EachjobJ ∈J hasan
+i
+recentwork[15]partiallyresolvesthisissueforHybridFlow- operation set O , which contains n operations O that must
+i i ij
+shop Scheduling Problem (HFSP), by viewing matrices as be processed in a specific order (i.e. precedence constraints).
+relationship between two item groups (jobs and machines), Each operation O can be processed on any machine M
+ij k
+anduseself-attention[30],asize-agnosticstructure,toprocess from its compatible set M ⊆ M for a processing time
+ij
+each item. However, this model is still limited to fixed num- p without preemption. Each machine can only process one
+ijk
+ber of HFSP stages. For Permutation Flow-Shop Scheduling operation at a time. To solve FJSP, one needs to assign each
+Problem (PFSP), a Recurrent Neural Network (RNN) based operation O to a compatible machine and determine its start
+ij
+architecture is designed in [31] to handle varying number of time S , such that the makespan C = max {C } is
+ij max i,j ij
+jobs and machines. However, it is specific to PFSP and not minimized where C is the completion time of O .
+ij ij
+applicable to FJSP. A disjunctive graph for FJSP [35] can be written as G =
+An arguably better representation technique for scheduling (O,C,D).Specifically,O ={O |∀i,j}∪{Start,End}isthe
+ij
+problems is GNN [32] which can process graphs of varying node set, which includes all operations and two dummy ones
+sizes, thus overcomes the limitation of matrix representation. (with zero processing time) representing the start and end of
+Zhangetal.[13]combineDRLandGNNtolearnhigh-quality production.C isthesetofconjunctivearcs,whicharedirected
+PDRs for JSP. They model states as disjunctive graphs with arcs that form n paths from Start to End representing the
+differentconnections,anduseGNNtoencodethestategraphs. respectiveprocessingsequenceofJ .D = (cid:83) D isthesetof
+i k k
+Park et al. [14] adopt a similar scheme using richer node disjunctive arcs which are undirected, and D is a clique that
+k
+(i.e. operation) features, and at the same time, considering the connectstheoperationsthatcanbeprocessedonmachineM .
+k
+different relationships between nodes in the GNN messages NotethatunlikeJSP,anoperationinFJSPcouldbeconnected
+passing process. Ni. et al [18] employ DRL to learn a local tomultipledisjunctivearcsduetotheflexibility.SolvingFJSP
+search heuristic for solvingHFSP. Theyrepresent thesolution is equivalent to selecting for each node a disjunctive arc, and
+at each search step as a multi-graph structure, and overcome fixing its direction. An illustration of disjunctive graph for
+thescalelimitationin[15]byanattentionbasedpoolingacross FJSP is given in Fig. 2.
+different stages.
+Till now, most related works focus on solving JSP using
+DRL, and cannot be applied to FJSP due its additional IV. METHOD
+complexity in decision-making and representation. For FJSP,
+the decision framework should be able to handle two types This section introduces the proposed method in detail. In
+of decisions, i.e. operation selection and machine assignment, thispaper,solvingFJSPisconsideredasasequentialdecision-
+and the representation scheme should be able to extract more making process, which iteratively takes a scheduling action
+informative state features especially for the flexible machines. to assign an operation to a compatible machine at each
+While HFSP is flexible due to the parallel machines at each state, until all operations are scheduled. The workflow of
+stage,itsproblemstructureissignificantlydifferentfromFJSP. the proposed method is shown in Fig. 3. In each iteration,
+The application of DRL in FJSP is rather sparse. Luo et al. the scheduling state is first transformed into a heterogeneous
+[33]employdeepQ-networktosolvedynamicFJSP.However, graph structure (Section IV-B). Then, a Heterogeneous Graph
+the action is to select from a pool of hand-crafted PDRs, Neural Network with a two-stage embedding process is ap-
+which heavily relies on human experience. Han and Yang pliedtotheheterogeneousgraphtoextractfeatureembeddings
+[34] propose an end-to-end DRL method for FJSP based on of the operations and machines (Section IV-C), which are
+a 3D disjunctive graph. However, the attention based policy consumed by the decision-making network to generate the
+network they designed only processes raw features without actionprobabilitydistribution,fromwhichaschedulingaction
+considering the graph structure, hence is limited in extracting is sampled (Section IV-D). In the following subsection, the
+useful information for high-quality decision making. MDP formulation of the above process is first presented.
+© 2022 IEEE. Personal use is permitted, but republication/redistribution requires IEEE permission.(cid:13)(cid:10)See https://www.ieee.org/publications/rights/index.html for more information.
+Authorized licensed use limited to: ASTAR. Downloaded on July 12,2022 at 01:32:57 UTC from IEEE Xplore. Restrictions apply.
+
+--- PAGE 5 ---
+This article has been accepted for publication in IEEE Transactions on Industrial Informatics. This is the author's version which has not been fully edited and
+content may change prior to final publication. Citation information: DOI 10.1109/TII.2022.3189725
+IEEETRANSACTIONSONINDUSTRIALINFORMATICS 4
+Fig. 3: The workflow of the proposed method.
+A. MDP Formulation
+The scheduling process considered here works as follows.
+At each decision step t (time 0 or when an operation is
+completed), the agent observes the current system state s
+t
+and makes a decision a , which is to allocate an unscheduled
+t
+operationtoanidlemachineandstartitfromthecurrenttime,
+denoted as T(t). Then the environment transits to the next
+decisionstept+1.Theprocessiteratesuntilalltheoperations
+are scheduled. The corresponding MDP is defined below. (a)Aninstance (b)Asolution
+State.Theconditionsofalloperationsandmachinesatstep Fig. 4: Heterogeneous graph of FJSP. Dotted line means
+t constitute state s t . The initial state s 0 is an FJSP instance processable, while solid line means scheduled.
+drawn from a distribution. Note that for each s , a partial
+t
+schedule S(t) is maintained, which is computed as follows.
+If O ij is scheduled, its start time S ij (t) is the actual value G= (cid:80)| t O = | 0 r(s t ,a t ,s t+1 )=C max (s 0 )−C max . For a specific
+S ij . Otherwise, S ij (t) is an estimate computed with only problem instance, C max (s 0 ) is a constant, which means that
+precedence constraints. If its immediate predecessor O il is minimizing C max and maximizing G are equivalent.
+scheduledonmachineM k ,thenS ij (t)=S il +p ilk ;otherwise Policy. A policy π(a t |s t ) defines for each state s t a proba-
+(cid:80)
+S ij (t) = S il (t)+p¯ il , where p¯ ij = Mk∈Mij p ijk /|M ij | is bility distribution over the action set A t . Later in this section,
+an estimated processing time of O ij . S ij (t) can be computed an DRL algorithm will be designed which parameterizes π
+recursively for all the unscheduled operations in the direction as a neural network and optimizes it towards the direction of
+from Start to End. maximizing the expected cumulative reward.
+Action. This paper uses an integrated approach to solve
+FJSP, which combines the operation selection and machine
+B. Heterogeneous Graph
+assignment as a composite decision. Specifically, an action
+a t ∈ A t is defined as a feasible operation-machine pair Previous works have employed disjunctive graph to repre-
+(O ij ,M k ) at step t, where O ij is eligible (i.e. its immediate sentJSPschedulingstatesandachievedgoodresults.However,
+predecessor is completed) and M k ∈M ij is idle. O ij starts the disjunctive graph of FJSP is more complicated. First, the
+on M k immediately, i.e. S ij =T(t). The action set A t is step disjunctive arc set D could be much larger since operations
+dependent,whichcollectsallthefeasiblepairs.Sinceeachjob can be processed by multiple machines. Such dense graph is
+canhaveatmostoneoperationreadyatatimeand|M ij |≤m, hard to be efficiently processed [13]. Second, the processing
+therefore |A t |≤n×m. times of an operation on different compatible machines are
+Transition. Based on s and a , the environment deter- different,makingitdifficulttorepresent.Toresolvetheabove
+t t
+ministically transits to a new state s , which is the time issue,thispaperdefinesanovelheterogeneousgraphstructure
+t+1
+when an operation is completed. In this paper, two difference H=(O,M,C,E) by modifying disjunctive graph. As shown
+states are distinguished by the topology and features of the in Fig. 4, the operation node set O and conjunctive arcs set
+corresponding heterogeneous graph structure. C are kept, and a set of machine nodes M is added, each for
+Reward. The reward is defined as the difference between one machine M . The disjunctive arc set D is replaced with
+k
+the makespan of the partial schedule at s and s , i.e. an operation-machine (O-M) arc set E, where each element
+t t+1
+r(s ,a ,s )=C (s )−C (s ). When the discount E ∈E is an undirected arc connects an operation node O
+t t t+1 max t max t+1 ijk ij
+factor γ = 1, the cumulative reward in an solving episode is with a compatible machine node M .
+k
+© 2022 IEEE. Personal use is permitted, but republication/redistribution requires IEEE permission.(cid:13)(cid:10)See https://www.ieee.org/publications/rights/index.html for more information.
+Authorized licensed use limited to: ASTAR. Downloaded on July 12,2022 at 01:32:57 UTC from IEEE Xplore. Restrictions apply.
+
+--- PAGE 6 ---
+This article has been accepted for publication in IEEE Transactions on Industrial Informatics. This is the author's version which has not been fully edited and
+content may change prior to final publication. Citation information: DOI 10.1109/TII.2022.3189725
+IEEETRANSACTIONSONINDUSTRIALINFORMATICS 5
+on O-M arcs (i.e. processing times) are of great importance
+for solving FJSP. However, existing HGNNs usually focus on
+node features only and do not consider arc features.
+To exploit the properties and advantages of the heteroge-
+neous graph structure, this paper proposes a novel HGNN
+architecturecustomizedforFJSPtoeffectivelyencodeH .As
+t
+shown in Fig. 5, the proposed method is featured with a two-
+stage embedding process, so as to take graph topological and
+Fig. 5: The two-stage embedding scheme. Update of machine
+numericalinformation(rawfeatures)intoaccount,andmapthe
+embedding ν(cid:48) and operation embedding µ(cid:48) are highlighted
+2 12 nodesinH intod-dimensionalembeddings.Inthefirststage,
+for illustration. t
+machine embeddings ν(cid:48) ∈ Rd are updated by aggregating
+k
+relevant information, while operation embeddings µ(cid:48) ∈ Rd
+ij
+are updated in the second stage. Details are given as follows.
+The above heterogeneous graph representation has several
+1) Machine node embedding: In H , neighbors of a ma-
+advantages over the original FJSP disjunctive graph. First, t
+chine M is a set of operations N (M ) which may have
+the graph density is significantly reduced. Suppose for each k t k
+different meanings to M . For example, operations that are
+machine M there are n processable operations, then |D|= k
+k k
+(cid:80) (cid:0)nk (cid:1)
+, while |E| =
+(cid:80)
+n . It is easy to prove that when
+expected to start sooner might be more important than those
+k 2 k k who start later. This motivates us to consider Graph Attention
+n > 3 holds for all M , |D| > |E|, and the difference
+k k
+Networks (GAT) [39], which automatically learns the impor-
+between |D| and |E| grows quadratically with the increase
+tance of different nodes by applying the attention mechanism
+of n . For large-sized problems, the heterogeneous graph H
+k
+[30]. For a homogeneous graph, given a node i with feature
+requires much less O-M arcs than the disjunctive arcs in G.
+x , GAT first computes the attention coefficient e (a scalar)
+Second, the machine nodes in H provide a convenient way i ij
+between i and each j in its first-order neighborhood N(i)
+to inject machine information and extract useful features to
+(including i itself) as:
+distinguish different machines in a state. Such information
+is very important to solve FJSP since operations need to be e =LeakyReLU (cid:0) a(cid:62)[Wx ||Wx ] (cid:1) . (1)
+ij i j
+allocated to a suitable machine, and is difficult to obtain in
+In other words, x and x are processed by a shared linear
+G. Finally, the processing time p is easily represented by i j
+ijk
+transformationWfirst,andthenconcatenated(||)andfedinto
+simply attaching as a feature to the O-M arc E .
+ijk
+a single-layer feedforward neural network with weights a and
+Based on the above definition of H, this paper represents
+LeakyReLU activation. Then the coefficients are normalized
+each state s as a heterogeneous graph H =(O,M,C,E ),
+t t t
+across the neighborhood using softmax function:
+where E dynamically changes during a solving episode.
+t
+Specifically, after an action (O ,M ) is taken at step t, Only exp(e )
+ij k α = ij ,∀j ∈N(i). (2)
+E ijk iskept andotherO-Marcs ofO ij areremoved toobtain ij (cid:80) q∈N(i) exp(e iq )
+H . Hence, the neighboring relationship among nodes also
+t+1
+Finally, GAT aggregates (linearly transformed) features over
+dynamically changes. For each step t, let N (O ) be the
+t ij
+N(i) and applys a nonlinearity σ to get the embedding of i:
+neighboring machines of operation O , and N (M ) be the
+ij t k
+m ne a i c g h h i b n o e ri a n n g d o O p - e M rat a io rc n , s ra o w f m fe a a c tu h r i e ne ve M ct k o . r F µ or ∈ ea R ch 6, o ν per ∈ ati R on 3, , x(cid:48) i =σ (cid:18) (cid:88) α ij Wx j (cid:19) . (3)
+ij ij j∈N(i)
+λ ∈ R are defined to reflect their states at step t. Detailed
+ij However,theoriginalGATisforhomogeneousgraphsonly
+definition can be found in the appendix.
+and does not consider arc features. Therefore, it is modified
+heretosatisfytheneedofthispaper,whichistocalculatethe
+C. Heterogeneous Graph Neural Network importance of a neighboring operation to a machine. First, it
+As typical in combinatorial problems, FJSP instances have can be observed that for each machine M k , there is only one
+varyingsizes.TolearnpracticalschedulingpolicyusingDRL, O-M arc connects it with a neighboring operation. Therefore,
+theneuralarchitecturemustbeabletooperateonstategraphs the raw feature vector of each O ij ∈ N t (M k ) is extended
+of different sizes. Previous works [13], [14], [18] have shown by concatenating its original raw features with that of the
+that GNN can achieve this size-agnostic property. However, corresponding O-M arc as µ ijk = [µ ij ||λ ijk ] ∈ R7. Next,
+they all deal with homogeneous graphs and hence are not instead of using a shared one, here two linear transformations
+applicable here. In the general GNN literature, research on WM ∈ Rd×3 and WO ∈ Rd×7 are used for the machine
+heterogeneous graph is rather sparse [32]. While some Het- nodes and operation nodes, respectively. Then for a machine
+erogeneous Graph Neural Networks (HGNNs) are proposed M k ,theattention coefficientse ijk ,i.e.the importanceofeach
+recently [36]–[38], they do not consider the unique properties neighboring operation O ij ∈N t (M k ) can be calculated as:
+of the FJSP heterogeneous graph H t . First, different node e =LeakyReLU (cid:0) a(cid:62)(cid:2) WMν ||WOµ (cid:3)(cid:1) , (4)
+types in H have strong connection patterns. Neighbors of ijk k ijk
+t
+any machine can only be operations connected by undirected where a∈R2d. In this way, information from heterogeneous
+arcs,whileanoperationcouldbeconnectedtobothoperations nodes and O-M arcs can be effectively incorporated in the
+and machines by directed or undirected arcs. Second, features attention computation.
+© 2022 IEEE. Personal use is permitted, but republication/redistribution requires IEEE permission.(cid:13)(cid:10)See https://www.ieee.org/publications/rights/index.html for more information.
+Authorized licensed use limited to: ASTAR. Downloaded on July 12,2022 at 01:32:57 UTC from IEEE Xplore. Restrictions apply.
+
+--- PAGE 7 ---
+This article has been accepted for publication in IEEE Transactions on Industrial Informatics. This is the author's version which has not been fully edited and
+content may change prior to final publication. Citation information: DOI 10.1109/TII.2022.3189725
+IEEETRANSACTIONSONINDUSTRIALINFORMATICS 6
+One thing not considered in Eq. (4) is the attention coeffi-
+cientofmachineM toitself,whichisinvolvedintheoriginal
+k
+GAT (see Eq. (1)). Here e is computed using the machine
+kk
+specific weights WM as follows:
+e =LeakyReLU (cid:0) a(cid:62)(cid:2) WMν ||WMν (cid:3)(cid:1) . (5)
+kk k k
+Then all e , ∀O ∈ N (M ) are normalized together with
+ijk ij t k
+e using softmax function to obtain the normalized attention
+kk
+coefficients α and α .
+ijk kk
+Finally, the machine embedding ν(cid:48) is computed by fusing Fig. 6: The network architecture.
+k
+features from neighboring operations and itself. Due to the
+importance of processing time, the extended raw feature
+vectorµ isusedforeachneighboringO .Theaggregation Through the above process, a varying-size heterogeneous
+ijk ij
+function for calculating ν(cid:48) is as follows: graphcanbetransformedintoafixed-dimensionalembedding.
+k
+Let θ be the collection of all the HGNN parameters.
+(cid:18) (cid:19)
+(cid:88)
+ν(cid:48) =σ α WMν + α WOµ . (6)
+k kk k ijk ijk
+Oij∈Nt(Mk)
+D. Decision Making
+2) Operation node embedding: Different from machines,
+As the last part of the proposed neural architecture, below
+neighborsofanoperationO inH isofseveraltypes,includ-
+ij t a policy network is designed. Remind that an action is a
+inganimmediatepredecessorO ,animmediatesuccessor
+i,j−1 feasibleoperation-machinepair.Thankstotheaboveheteroge-
+O , and the machines in N (O ). Moreover, O and
+i,j+1 t ij i,j−1 neous graph structure and HGNN, the policy π(a |s ) is easy
+O are connected to O by directed arcs from opposite t t
+i,j+1 ij and convenient to represent using the extracted embeddings.
+direction, while M ∈ N (O ) are connected by undirected
+k t ij Specifically, for each feasible action a = (O ,M ) ∈ A
+arcs. Due to the heterogeneity of information sources and arc t ij k t
+at step t, the corresponding operation, machine and state
+types, it is not very helpful and convenient to apply attention
+embedding are concatenated, and fed into an MLP to get its
+based mechanisms. Instead, this paper directly uses multiple
+priority index of being selected at state s as follows:
+MLPs to process information from each source (including the t
+(cid:104) (cid:105)
+features of O ij itself), concatenates the results, and projects it P(a t ,s t )=MLP ω µ(cid:48) i ( j L)||ν k (cid:48)(L)||h t , (9)
+back to the d-dimensional space as the embedding of O .
+ij
+defi S n p e e d c , ifi e c a a c l h ly, w fi it v h e d M -d L im Ps en (d s e io n n o a te l d ou a t s p M ut, L t P w θ o 0 , d .. h ., -d M im L e P n θ s 4 i ) on ar a e l w ta h n e h re act M iv L at P io ω n. h T as hen tw t o he d p π r - o d b im ab e i n li s t i y on o a f l se h l i e d c d t e in n g l e a a y c e h rs a t an i d s
+hidden layers, and ELU activation. They are responsible for calculated by applying softmax over all P(a t ,s t ):
+t O h i e ,j fi + n 1 al M p k ro ∈ jec N ti t o ( n O , i a j n ), d a p n r d oc O es ij si , n r g es i p n e f c o t r i m ve a l t y io . n Si f n r c o e m N O t ( i, O j− ij 1 ) , π ω (a t |s t )= (cid:80) exp( e P xp (a ( t P ,s (a t ) (cid:48) ) ,s )) ,∀a t ∈A t . (10)
+may have multiple machines, element-wise sum is applied
+a(cid:48)
+t
+∈At t t
+to obtain ν¯(cid:48) = (cid:80) ν(cid:48) as the input to MLP . The Duringtraining,actionsaresampledaccordingtothepolicy
+computation ij of emb k e ∈ d N d t in (O g ij f ) or k O ij is as follows: θ3 π ω , so as to enable exploration. For testing, there could be
+two strategies of utilizing a trained policy π to solve a
+µ(cid:48) =MLP (ELU[MLP (µ )||MLP (µ ) ω
+ij θ0 θ1 i,j−1 θ2 i,j+1
+(7)
+given instance, including 1) greedily picking actions with the
+||MLP θ3 (ν¯ i (cid:48) j )||MLP θ4 (µ ij )]). maximum probability, and 2) sampling actions following π ω
+at each state, same as in training. Different from the greedy
+Note that there is no need to compute embeddings of the two
+one, the solutions delivered by the sampling strategy could
+dummy operations Start and End.
+3) Stacking and pooling: The above embedding process be different each run due to the stochasticity. This provides
+can be considered as a HGNN layer, which transforms raw additional possibilities of finding better solutions since in
+features µ and ν of each operation and machine into general, current DRL algorithms can only converge to sub-
+ij k
+embeddings µ(cid:48) and ν(cid:48). To enhance feature extraction ability, optimal policies. In particular, the sampling strategy solves
+ij k
+here L HGNN layers with identical structure but independent N s copies of a given instance to obtain N s solutions, from
+trainableparametersarestackedtoobtainthefinalembeddings which it picks the best one as in [40]. Note that for neural
+µ(cid:48)(L) and ν(cid:48)(L). Raw features µ and ν of operation and policies, the additional overhead of sampling is often small
+ij k ij k
+since GPU is able to sample solutions in parallel.
+machine nodes are only used in the first layer, while raw
+features λ of O-M arcs are used in all the L layers.
+ijk
+AftertheLlayersofHGNN,meanpoolingisappliedtothe E. Training
+obtainedoperationembeddingsetandmachineembeddingset This paper uses PPO [41] for training which employs an
+separately. The resulting two d-dimensional vectors are then actor-critic structure. Actor is the policy network π and
+ω
+concatenatedastheembeddingh t ∈R2d oftheheterogeneous critic v φ is another network that predicts the value v(s t ) of
+graph state H t as follows: a state s t . Here the critic is designed as an MLP, which
+h = (cid:20) 1 (cid:88) µ(cid:48)(L) (cid:107) 1 (cid:88) ν(cid:48)(L) (cid:21) . (8) takes input the state embedding h t computed by the HGNN
+t |O| Oij∈O ij |M| Mk∈M k to get v φ (s t ). MLP φ has the same structure as MLP π , i.e.
+© 2022 IEEE. Personal use is permitted, but republication/redistribution requires IEEE permission.(cid:13)(cid:10)See https://www.ieee.org/publications/rights/index.html for more information.
+Authorized licensed use limited to: ASTAR. Downloaded on July 12,2022 at 01:32:57 UTC from IEEE Xplore. Restrictions apply.
+
+--- PAGE 8 ---
+This article has been accepted for publication in IEEE Transactions on Industrial Informatics. This is the author's version which has not been fully edited and
+content may change prior to final publication. Citation information: DOI 10.1109/TII.2022.3189725
+IEEETRANSACTIONSONINDUSTRIALINFORMATICS 7
+TABLE I: Instance generation distributions
+two hidden layers with d dimension and tanh activation, but
+φ
+with different parameters φ and different input dimension (2d
+instead of 4d). The overall network architecture is shown in
+Size(n×m) ni 1 |Mij|2 p¯ij 3
+10×5 U(4,6) U(1,5) U(1,20)
+Fig. 6. As shown in Algorithm 1, the training is performed
+20×5 U(4,6) U(1,5) U(1,20)
+forI iterations,duringwhichabatchofB instances(replaced 15×10 U(8,12) U(1,10) U(1,20)
+every 20 iterations) are solved by the DRL agent in parallel 20×10 U(8,12) U(1,10) U(1,20)
+30×10 U(8,12) U(1,10) U(1,20)
+(Line 3-10). During training, the policy is validated on a set
+40×10 U(8,12) U(1,10) U(1,20)
+of independent validation instances every 10 iterations.
+1NumberofoperationsinJobJi;
+2NumberofcompatiblemachinesforoperationOij;
+Algorithm 1: Training procedure with PPO 3AverageprocessingtimeofoperationOij.
+Input: HGNN network, policy network and critic network
+with trainable parameters θ, ω and φ
+1 Sample a batch of B FJSP instances;
+2 for iter=1,2,...,I do
+3 for b=1,2,...,B do // In parallel
+4 Initialize s t based on instance b;
+5 while s t is not terminal do
+6 Extract embeddings using HGNN;
+7 Sample a t ∼π ω (·|s t );
+8 Receive reward r t and next state s t+1 ;
+9 s t ←s t+1 ;
+10 Compute the generalised advantage estimates Aˆ t for
+each step;
+Fig. 7: Training curve on 10×5 instances.
+11 Compute the PPO loss L, and optimize the parameters
+θ, ω and φ for R epochs;
+TABLE II: Results on synthetic instances of training size
+12 Update network parameters;
+13 if iter mod 10=0 then
+14 Validate the policy; Size OR-Tools1 DRL-G DRL-S MOR SPT FIFO MWKR
+15 if iter mod 20=0 then 10×5 C G m a a p x 96.59 - (15%) 1 1 5 1 . 1 7 . 1 6 % 7 1 9 0 .3 5 8 .6 % 1 2 1 0 1 . 6 8 . 9 6 % 9 3 1 3 2 . 9 5 . 7 0 % 6 2 1 3 1 . 9 9 . 4 6 % 2 1 1 9 1 . 5 4 . 4 2 % 9
+16 Sample a new batch of B FJSP instances;
+20×5
+Cmax 188.45(0%) 211.22 207.50 217.17 229.89 216.13 216.98
+Gap - 12.10% 10.13% 15.29% 22.08% 14.73% 15.17%
+17 return;
+15×10
+Cmax 145.42(5%) 166.92 160.36 173.40 198.20 185.08 169.18
+Gap - 14.80% 10.31% 19.29% 36.30% 27.27% 16.34%
+20×10
+Cmax 197.24(0%) 215.78 214.87 221.86 254.59 234.21 220.85
+V. EXPERIMENTS Gap - 9.43% 8.97% 12.53% 29.09% 18.82% 11.99%
+This section shows experimental results on synthetic and
+1(.%):percentageofinstancessolvedoptimallywithin1800seconds.
+public FJSP instances to validate the proposed method.
+2) Configuration: This paper sets the number of HGNN
+A. Experimental Settings
+iterations as L=2, and dimensions of machine and operation
+1) Evaluation Instances: As in most related works, this embeddingsasd=8.FortheMLPs,thehiddendimensionsare
+paper generates synthetic FJSP instances for training and set as d =128, and d =d = 64. For training, the number
+h π φ
+testing. The generation method is similar to the well-known oftrainingiterationsandinstancebatchsizeissettoI=1000
+procedure in [35]. As listed in Table I, six problem sizes are and B=20. For the PPO loss function, the coefficients of the
+considered. For each size, an instance is sampled by drawing policy loss (with 0.2 clip ratio), value loss and entropy term
+fromthecorrespondinguniformdistributioninTableI(p ijk is are set as 1, 0.5 and 0.01, respectively. The PPO optimization
+sampledfromU(0.8p¯ ij ,1.2p¯ ij )).Thispaperperformstraining epochs is set to R = 3, and discount factor is set to γ =
+on the four smaller sizes, and uses the largest two (30×10 1.0. The network is updated using the Adam optimizer, with
+and 40×10) to test the generalization capability of the trained learningratelr =2×10−4.Fortesting,thetrainedpoliciesare
+policies. The training instances are generated on-the-fly (with testedusingboththegreedyandsamplingstrategy(withN =
+s
+100 validation instances), while for testing 100 instances are 100solutions)mentionedinSectionIV-D,namedDRL-Gand
+sampled for each size. Besides the synthetic instances, two DRL-S, respectively. These hyperparameters are empirically
+well-knownFJSPbenchmarksareusedforgeneralizationanal- tuned on the smallest problem size 10×5, and fixed on the
+ysis, including the 10 mk instances (mk01-mk10) in [35] and remaining sizes. The hardware is a machine with Intel Xeon
+the three groups of la instances (rdata, edata and vdata, each Gold 6152 CPU, one Nvidia Titan V GPU and Ubuntu 16.04
+with40instances)in[42].Theseinstancesareofvarioussizes 64-bit OS. The code in Pytorch is publicly available1.
+(ranging from 10×6 to 30×10), drawing from distributions 3) Baselines: The learned FJSP scheduling policies are
+significantly different from those in Table I. Hence, testing compared with four well-known PDRs that work well in
+on these benchmarks can further verify the proposed method practice, including FIFO (Firt In First Out), MOR (Most
+in generalizing to out-of-distribution instances. More details
+about these instances can be found in [43]. 1https://github.com/songwenas12/fjsp-drl
+© 2022 IEEE. Personal use is permitted, but republication/redistribution requires IEEE permission.(cid:13)(cid:10)See https://www.ieee.org/publications/rights/index.html for more information.
+Authorized licensed use limited to: ASTAR. Downloaded on July 12,2022 at 01:32:57 UTC from IEEE Xplore. Restrictions apply.
+
+--- PAGE 9 ---
+This article has been accepted for publication in IEEE Transactions on Industrial Informatics. This is the author's version which has not been fully edited and
+content may change prior to final publication. Citation information: DOI 10.1109/TII.2022.3189725
+IEEETRANSACTIONSONINDUSTRIALINFORMATICS 8
+TABLE III: Results on the large-sized synthetic instances
+Operations Remaining), SPT (Shortest Processing Time), and
+MWKR (Most Work Remaining) [35], [44]. For MWKR,
+Size OR-Tools1 DRL-G DRL-S MOR SPT FIFO MWKR
+average processing time p¯ is used to compute the priority,
+just as [35] did. For fair c i o j mparison, the baseline PDRs are 30×10 C G m a a p x 294.10 - (0%) 3 6 1 .4 3 6 .0 % 4 3 6 1 .1 2 8 .2 % 0 3 8 2 .9 0 0 .1 % 8 1 3 8 4 . 7 1 . 2 4 % 0 1 3 1 2 . 8 7 . 4 5 % 0 3 8 1 .7 9 9 .8 % 9
+implementedinthesameenvironmentastheproposedmethod,
+40×10
+Cmax 397.36(0%) 416.18 415.14 425.19 443.30 427.22 425.70
+so as to verify that a learned policy is indeed better than a Gap - 4.75% 4.49% 7.02% 11.57% 7.53% 7.15%
+hand-crafted one. At each decision point, after an operation 1(.%):percentageofinstancessolvedoptimallywithin1800seconds.
+is selected by a PDR, it is assigned to the corresponding idle
+TABLE IV: Run time (in seconds) comparison
+machine immediately. This paper also compares with Google
+OR-Tools2,apowerfulconstraintprogrammingsolvershowing
+Size OR-Tools DRL-G DRL-S MOR SPT FIFO MWKR
+strong performance in solving industrial scheduling problems
+10×5 1597.88 0.32 0.82 0.15 0.15 0.15 0.16
+[45]. Since OR-Tools is an exact solver, a time limit of 1800 20×5 1800.00 0.63 1.71 0.29 0.31 0.29 0.31
+seconds is set, and the obtained optimal or best solutions are 15×10 1724.00 0.99 2.99 0.42 0.44 0.42 0.46
+usedtoevaluatesolutionqualityofthelearnedorhand-crafted 20×10 1800.00 1.27 4.52 0.58 0.60 0.58 0.61
+30×10 1800.00 1.90 8.60 0.87 0.90 0.87 0.93
+PDRs. For the public benchmarks, this paper also compares 40×10 1800.00 2.53 15.37 1.17 1.20 1.16 1.25
+with results of the DRL method [34] and two recent Genetic
+Algorithms (GA) in [26] and [27], as well as the best known
+solutions collected in [43]. For each solution with makespan other sizes. This may be caused by the graph structure of the
+C max , its relative gap to the makespan C m B a S x of the best 20×5 instances. For this distribution, each job tend to have
+solution (not necessarily optimal) is calculated as follows: fewer operations and fewer compatible machines, which may
+(cid:15)= (cid:0) C /CBS −1 (cid:1) ×100%. (11) affect the effectiveness of HGNN.
+max max 2) Generalization performance on large-sized instances:
+This paper further examines the capability of the proposed
+size-agnostic policy in generalizing to unseen large-sized in-
+B. Performance on Synthetic Instances
+stances. To this end, the policy trained on 20×10 instances is
+The training process of the proposed DRL method is fairly directlyrunon30×10and40×10instances,andtheresultsare
+stable, and converged on all the four training sizes. Here for summarizedinTableIII.Itcanbeobservedthattheadvantage
+brevity, the training curve on 10×5 is in Fig. 7, which is oftheproposedmethodstillmaintainsontheselargeinstances,
+plotted base on the average makespan on the 100 validation showing that the patterns learned on small and medium-sized
+instances.Itcanbeobservedthatwithouthumanintervention, instances are still effective in solving large-sized ones.
+theDRLagentcanindeedlearnhigh-qualityschedulingpolicy 3) Run time analysis: Table IV lists the average run time
+from scratch, based on its own solving experiences. Next, the of the proposed method and PDR baselines. It can be seen
+trainedpolicieswillbeevaluatedonthesyntheticinstancesof that that the proposed method maintains the high efficiency
+thesamesizeasintraining,andlargersizesunseenintraining. of PDR based methods, and the run time increases mildly
+Run time analysis will also be provided. with the increase of problem size. For a given size, the run
+1) Evaluationoninstancesoftrainingsizes: Foreachofthe time of the proposed method is longer than other PDRs.
+training size, Table II reports the average makespan and gap This is because neural network inference is more costly than
+to the OR-Tools solutions on the 100 testing instances drawn the simple rules employed by hand-crafted PDRs, which is
+fromthesamedistributionasintraining.Ascanbeseen,even consistent with other works (e.g. [13], [14]) and is reasonable
+for small-sized problems, OR-Tools can only solve a small considering the performance boost. For training, the proposed
+portion of instances optimally within the time limit, showing method takes about 0.36h, 0.69h, 1.18h and 1.64h on the four
+the complexity of FJSP. For the PDR based methods, the training sizes 10×5, 20×5, 15×10 and 20×10, respectively.
+proposed method (in both strategies) consistently outperforms It can be concluded that the training time increases relatively
+all baseline PDRs in the four training sizes. The average gap mildly with the increase of problem size. Considering that
+oftheproposedmethodtotheOR-Toolssolutionsrangesfrom training is offline, such time efficiency is acceptable.
+9% to 16% using the greedy strategy, which is similar to the
+resultsof[13]and[14]inJSPstudy.Meanwhile,thesampling
+C. Performance on Public Benchmarks
+strategy can further boost the performance and reduce the gap
+to be within 11%. To have a more detailed comparison, the This subsection further evaluates the generalization perfor-
+proposed method is used as reference to compute the gap of mance of the trained policies on the two public benchmarks
+each baseline PDRs, and the boxplots are shown in Fig. 8. that are often used in traditional research, by directly running
+It can be observed that the proposed method performs better the four policies trained in Section V-B (named DRL n×m)
+thanbaselinePDRsonmorethan75%oftheinstances,except on the benchmark instances. Results are summarized in Table
+on 15×10 where it manages to surpass MWKR on nearly V (gaps are computed with respect to the best solutions in
+75% of the instances. Improvement of the proposed method [43]), which also includes results from the recent DRL [34]
+against baseline PDRs on 20×5 is relatively small than on and GA [26], [27] baselines. In particular, [26] proposes a
+self-learning GA (SLGA) that uses reinforcement learning to
+2https://developers.google.com/optimization adjust the GA parameters during solving FJSP instances. [27]
+© 2022 IEEE. Personal use is permitted, but republication/redistribution requires IEEE permission.(cid:13)(cid:10)See https://www.ieee.org/publications/rights/index.html for more information.
+Authorized licensed use limited to: ASTAR. Downloaded on July 12,2022 at 01:32:57 UTC from IEEE Xplore. Restrictions apply.
+
+--- PAGE 10 ---
+This article has been accepted for publication in IEEE Transactions on Industrial Informatics. This is the author's version which has not been fully edited and
+content may change prior to final publication. Citation information: DOI 10.1109/TII.2022.3189725
+IEEETRANSACTIONSONINDUSTRIALINFORMATICS 9
+(a)10×05 (b)20×05 (c)15×10 (d)20×10
+Fig. 8: Relative gaps of the hand-crafted PDRs to the DRL policy
+TABLE V: Results on the public benchmarks
+mk la(rdata) la(edata) la(vdata)
+Method
+Cmax Gap Time Cmax Gap Time Cmax Gap Time Cmax Gap Time
+OR-Tools 174.90 1.42% 905.45s 938.38 0.28% 1203.89s 1026.70 -0.19% 226.53s 924.40 0.38% 1367.77s
+SLGA[26] 181.30 6.21% 283.28s - - - - - - - - -
+RegGA[27] 183.00 8.39% 280.10s - - - - - - 836.131 3.20% 191.40s
+2SGA[27] 175.20 3.17% 57.60s - - - - - - 812.201 0.39% 51.43s
+201.00 27.83% 0.91s 1030.83 11.15% 1.03s 1187.48 15.53% 1.00s 955.90 4.25% 1.00s
+DRL210×5
+190.403 19.02% 3.11s 986.10 5.75% 3.56s 1116.33 8.18% 3.58s 932.00 1.44% 3.47s
+215.60 39.00% 0.92s 1080.30 17.19% 0.99s 1198.55 16.62% 0.98s 967.78 6.19% 0.98s
+DRL20×5
+197.40 24.68% 3.10s 1016.90 9.03% 3.54s 1135.38 9.91% 3.61s 943.53 2.79% 3.51s
+197.70 25.39% 0.90s 1031.33 11.14% 0.97s 1182.08 15.00% 1.04s 954.33 4.02% 0.96s
+DRL15×10
+191.30 19.32% 3.21s 987.08 5.81% 3.50s 1118.35 8.57% 3.56s 931.45 1.36% 3.54s
+200.30 30.05% 0.90s 1044.03 12.85% 0.99s 1204.45 17.24% 1.00s 950.75 3.96% 0.99s
+DRL20×10
+193.50 21.12% 3.13s 1004.33 7.50% 3.55s 1135.78 9.93% 3.60s 934.83 1.77% 3.46s
+Han[34] 216.90 34.04% - - - - - - - - - -
+MOR 202.31 29.59% 0.40s 1064.04 14.71% 0.45s 1211.23 17.91% 0.45s 969.25 6.09% 0.45s
+SPT 238.80 45.73% 0.41s 1184.80 27.70% 0.46s 1305.35 26.19% 0.46s 1085.46 18.20% 0.46s
+FIFO 206.09 30.72% 0.39s 1082.08 16.63% 0.44s 1255.46 22.07% 0.45s 980.69 7.50% 0.44s
+MWKR 200.17 28.19% 0.45s 1046.20 12.53% 0.51s 1179.90 14.92% 0.50s 962.01 5.11% 0.50s
+1ThegapofRegGAand2SGAarecomputedon30outof40lavdatainstances(la01-la30),onwhich[27]reportedresults.
+2ForthetworowsofeachDRLpolicy,theaboveandbelowrowisresultofthegreedyandsamplingstrategy,respectively.
+3BoldmeansthebestperformanceamongthePDRbasedmethods.
+proposes a two-stage GA (2SGA) for FJSP, which improves general. With sampling, it even achieves the optimal solutions
+the Regular GA (RegGA) by a first stage that generates high- on two mk instances (mk03 and mk08), and finds solutions
+quality initial population. Results of both 2SGA and RegGA within5%gaptothebestsolutionsin[43]formorethan50%
+in [27] are included here. (69 out of 120) of the la instances. This might be because for
+the simpler learning task, the training of DRL agent could be
+The upper part of Table V shows that OR-Tools obtains more sufficient so that it can discover better patterns. We will
+very good solutions, though it only solves half instances investigate this in the future. As another interesting direction,
+optimally. The GA methods also find high-quality solutions. the fast and high-quality solving performance of the proposed
+However, run time of these search-based methods is much method provides additional possibilities of being integrated
+longer than the PDR based ones in the lower part of Table V. with the search-based methods, for example generating initial
+It can be seen that the proposed method with greedy strategy populations in 2SGA.
+generally performs better than other baseline PDRs on both
+benchmarks, and the sampling strategy further reduces the
+VI. CONCLUSIONSANDFUTUREWORK
+gaps. This shows that the learned policies generalize well to
+these out-of-distribution instances. The four learned policies Solving flexible scheduling problems efficiently is of great
+have almost the same run time, since they have the same importance to the next generation manufacturing paradigms
+neural structure with only different parameters. Compared to such as cloud manufacturing. This paper proposes a novel
+the recent method [34] which reported results on the mk end-to-end DRL method to learn high-quality PDRs for FJSP,
+benchmark, the proposed method significantly outperforms whichis widelyused in practise but rarelystudied byexisting
+it by a large margin (except the policy trained on 20×5 DRLbasedmethods.TheunderlyingMDPisformulatedusing
+instances), showing the advantage of the HGNN network in an integrated approach, which combines operation selection
+extractingrichstateinformationforbetterdecisionmaking.An and machine assignment as one decision. Then a heteroge-
+interesting observation is that among the four of our policies, neous graph structure is proposed to represent scheduling
+theonetrainedonthesmallestsize10×5performsthebestin states, which is processed by a novel HGNN architecture so
+© 2022 IEEE. Personal use is permitted, but republication/redistribution requires IEEE permission.(cid:13)(cid:10)See https://www.ieee.org/publications/rights/index.html for more information.
+Authorized licensed use limited to: ASTAR. Downloaded on July 12,2022 at 01:32:57 UTC from IEEE Xplore. Restrictions apply.
+
+--- PAGE 11 ---
+This article has been accepted for publication in IEEE Transactions on Industrial Informatics. This is the author's version which has not been fully edited and
+content may change prior to final publication. Citation information: DOI 10.1109/TII.2022.3189725
+IEEETRANSACTIONSONINDUSTRIALINFORMATICS 10
+as to convert the numerical and topological information in the [6] K.Gao,Z.Cao,L.Zhang,Z.Chen,Y.Han,andQ.Pan,“Areviewon
+graphintofeatureembeddings.BasedontheHGNN,anactor- swarmintelligenceandevolutionaryalgorithmsforsolvingflexiblejob
+shop scheduling problems,” IEEE/CAA Journal of Automatica Sinica,
+critic architecture is designed and trained with PPO. Results
+vol.6,no.4,pp.904–916,2019.
+show that the proposed method outperforms baseline PDRs [7] J.Xie,L.Gao,K.Peng,X.Li,andH.Li,“Reviewonflexiblejobshop
+with reasonable efficiency, and generalizes well to unseen scheduling,”IETCollaborativeIntelligentManufacturing,vol.1,no.3,
+pp.67–77,2019.
+instances of larger sizes and from public benchmarks. For
+[8] J. Zhang, G. Ding, Y. Zou, S. Qin, and J. Fu, “Review of job shop
+future work, the method will be extended to handle more schedulingresearchanditsnewperspectivesunderindustry4.0,”Journal
+challenging factors in practical production, such as batching, ofIntelligentManufacturing,vol.30,no.4,pp.1809–1830,2019.
+[9] B. Chen and T. I. Matis, “A flexible dispatching rule for minimizing
+due dates, and uncertainties. In addition, the multi-optima
+tardiness in job shop scheduling,” International Journal of Production
+property [46] of FJSP (i.e., an instance could have multiple Economics,vol.141,no.1,pp.360–365,2013.
+optimal solutions) will be exploited to enhance the training [10] C.-C.Lin,D.-J.Deng,Y.-L.Chih,andH.-T.Chiu,“Smartmanufacturing
+schedulingwithedgecomputingusingmulticlassdeepqnetwork,”IEEE
+performance. The possibilities of combining with advanced
+Transactions on Industrial Informatics, vol. 15, no. 7, pp. 4276–4284,
+search mechanisms such as GA will also be investigated. 2019.
+[11] C.-L. Liu, C.-C. Chang, and C.-J. Tseng, “Actor-critic deep reinforce-
+mentlearningforsolvingjobshopschedulingproblems,”IEEEAccess,
+APPENDIX vol.8,pp.71752–71762,2020.
+DEFINITIONOFRAWFEATUREVECTORS [12] L. Wang, X. Hu, Y. Wang, S. Xu, S. Ma, K. Yang, Z. Liu, and
+W.Wang,“Dynamicjob-shopschedulinginsmartmanufacturingusing
+For each state S t , the raw features of each operation, deepreinforcementlearning,”ComputerNetworks,vol.190,2021.
+machine and O-M arcs are defined as follows (dependence [13] C.Zhang,W.Song,Z.Cao,J.Zhang,P.S.Tan,andX.Chi,“Learning
+to dispatch for job shop scheduling via deep reinforcement learning,”
+on t is ignored for clearance):
+AdvancesinNeuralInformationProcessingSystems,vol.33,2020.
+Raw features of operation nodes. For each O ij ∈ O \ [14] J. Park, J. Chun, S. Kim, Y. Kim, and J. Park, “Learning to schedule
+{Start,End}, raw feature vector µ ∈R6 has 6 elements: job-shop problems: representation and policy learning using graph
+ij
+neural network and reinforcement learning,” International Journal of
+• Status: a binary value indicates whether O ij has been ProductionResearch,vol.59,no.11,pp.3360–3377,2021.
+scheduled (1) or not (0) till step t. [15] Y.-D.Kwon,J.Choo,I.Yoon,M.Park,D.Park,andY.Gwon,“Matrix
+encodingnetworksforneuralcombinatorialoptimization,”inAdvances
+• Number of neighboring machines: |N t (O ij )|. inNeuralInformationProcessingSystems,2021.
+• Processing time: p ijk if O ij is scheduled, otherwise p¯ ij . [16] Z. Wang, C. Liu, and M. Gombolay, “Heterogeneous graph attention
+• Starttime:theestimatedoractualstarttimeofO ij inthe networks for scalable multi-robot scheduling with temporospatial con-
+straints,”AutonomousRobots,2021.
+corresponding partial schedule S(t).
+[17] L. Xin, W. Song, Z. Cao, and J. Zhang, “Step-wise deep learning
+• Numberofunscheduledoperationsinthejob:thenumber modelsforsolvingroutingproblems,”IEEETransactionsonIndustrial
+of operations in O that have not been scheduled. Informatics,vol.17,no.7,pp.4861–4871,2020.
+i
+[18] F. Ni, J. Hao, J. Lu, X. Tong, M. Yuan, J. Duan, Y. Ma, and K. He,
+• Job completion time: C i in the partial schedule S(t). “A multi-graph attributed reinforcement learning based optimization
+Note that for the two dummay operations Start and End, algorithm for large-scale hybrid flow shop scheduling problem,” in
+Proceedings of the 27th ACM SIGKDD Conference on Knowledge
+zero vectors are used when necessary.
+Discovery&DataMining,2021,pp.3441–3451.
+Raw features of machine nodes. For each M k ∈ M, 3 [19] C.O¨zgu¨ven,L.O¨zbakır,andY.Yavuz,“Mathematicalmodelsforjob-
+features are used to form its raw feature vector ν ∈R3: shop scheduling problems with routing and process plan flexibility,”
+k
+AppliedMathematicalModelling,vol.34,no.6,pp.1539–1548,2010.
+• Available time: the time when M k completes all its [20] D.Mu¨ller,M.G.Mu¨ller,D.Kress,andE.Pesch,“Analgorithmselec-
+assigned operations and can process new operations. tion approach for the flexible job shop scheduling problem: Choosing
+• Number of neighboring operations: |N t (M k )|. J c o o u n r s n tr a a l in o t f p O ro p g e r r a a m tio m n i a n l g R s e o s l e v a e r r c s h, th 2 r 0 o 2 u 2 g . h machine learning,” European
+• Utilization: ratio of the non-idle time to the total produc- [21] M. A. Ort´ız, L. E. Betancourt, K. P. Negrete, F. De Felice, and
+tion time of M k till T(t), and is within the range [0,1]. A. Petrillo, “Dispatching algorithm for production programming of
+flexible job-shop systems in the smart factory industry,” Annals of
+Raw feature of O-M arcs. For each E ∈ E, its raw
+ijk OperationsResearch,vol.264,no.1,pp.409–433,2018.
+feature vector λ ijk ∈ R contains only one element, i.e. the [22] B. Huang, Y. Sun, and Y. Sun, “Scheduling of flexible manufacturing
+corresponding processing time p . systemsbasedonpetrinetsandhybridheuristicsearch,”International
+ijk
+JournalofProductionResearch,vol.46,no.16,pp.4553–4565,2008.
+[23] O. Sobeyko and L. Mo¨nch, “Heuristic approaches for scheduling jobs
+REFERENCES in large-scale flexible job shops,” Computers & Operations Research,
+vol.68,pp.97–109,2016.
+[1] L.ThamesandD.Schaefer,“Software-definedcloudmanufacturingfor [24] V. Kaplanog˘lu, “An object-oriented approach for multi-objective flex-
+industry4.0,”ProcediaCIRP,vol.52,pp.12–17,2016. ible job-shop scheduling problem,” Expert Systems with Applications,
+[2] H. Golpˆıra, S. A. R. Khan, and S. Safaeipour, “A review of logistics vol.45,pp.71–84,2016.
+internet-of-things:Currenttrendsandscopeforfutureresearch,”Journal [25] S.JiaandZ.-H.Hu,“Path-relinkingtabusearchforthemulti-objective
+ofIndustrialInformationIntegration,vol.22,p.100194,2021. flexible job shop scheduling problem,” Computers & Operations Re-
+[3] Y.Liu,L.Wang,X.V.Wang,X.Xu,andL.Zhang,“Schedulingincloud search,vol.47,pp.11–26,2014.
+manufacturing: state-of-the-art and research challenges,” International [26] R. Chen, B. Yang, S. Li, and S. Wang, “A self-learning genetic algo-
+Journal of Production Research, vol. 57, no. 15-16, pp. 4854–4879, rithmbasedonreinforcementlearningforflexiblejob-shopscheduling
+2019. problem,” Computers & Industrial Engineering, vol. 149, p. 106778,
+[4] Y.Fang,C.Peng,P.Lou,Z.Zhou,J.Hu,andJ.Yan,“Digital-twin-based 2020.
+jobshopschedulingtowardsmartmanufacturing,”IEEETransactionson [27] D. Rooyani and F. M. Defersha, “An efficient two-stage genetic algo-
+IndustrialInformatics,vol.15,no.12,pp.6425–6435,2019. rithm for flexible job-shop scheduling,” IFAC-PapersOnLine, vol. 52,
+[5] Y.Zhang,J.Wang,S.Liu,andC.Qian,“Gametheorybasedreal-time no.13,pp.2519–2524,2019.
+shop floor scheduling strategy and method for cloud manufacturing,” [28] B. Waschneck, A. Reichstaller, L. Belzner, T. Altenmu¨ller, T. Bauern-
+International Journal of Intelligent Systems, vol. 32, no. 4, pp. 437– hansl,A.Knapp,andA.Kyek,“Deepreinforcementlearningforsemi-
+463,2017. conductorproductionscheduling,”in201829thAnnualSEMIAdvanced
+© 2022 IEEE. Personal use is permitted, but republication/redistribution requires IEEE permission.(cid:13)(cid:10)See https://www.ieee.org/publications/rights/index.html for more information.
+Authorized licensed use limited to: ASTAR. Downloaded on July 12,2022 at 01:32:57 UTC from IEEE Xplore. Restrictions apply.
+
+--- PAGE 12 ---
+This article has been accepted for publication in IEEE Transactions on Industrial Informatics. This is the author's version which has not been fully edited and
+content may change prior to final publication. Citation information: DOI 10.1109/TII.2022.3189725
+IEEETRANSACTIONSONINDUSTRIALINFORMATICS 11
+Semiconductor Manufacturing Conference (ASMC). IEEE, 2018, pp. Xinyang Chen received the B.S. degree in au-
+301–306. tomation from Shandong University, Jinan, China,
+[29] D. Shi, W. Fan, Y. Xiao, T. Lin, and C. Xing, “Intelligent scheduling in 2019 and the M.S. degree in control science
+ofdiscreteautomatedproductionlineviadeepreinforcementlearning,” and engineering from the same university in 2022.
+InternationalJournalofProductionResearch,vol.58,no.11,pp.3362– His main research interests include deep reinforce-
+3380,2020. ment learning, cyber-physical system, and produc-
+[30] A.Vaswani,N.Shazeer,N.Parmar,J.Uszkoreit,L.Jones,A.N.Gomez, tionscheduling.
+Ł. Kaiser, and I. Polosukhin, “Attention is all you need,” in Advances
+inNeuralInformationProcessingSystems,2017,pp.5998–6008.
+[31] Z. Pan, L. Wang, J. Wang, and J. Lu, “Deep reinforcement learning
+based optimization algorithm for permutation flow-shop scheduling,”
+IEEE Transactions on Emerging Topics in Computational Intelligence,
+2021.
+[32] Z. Wu, S. Pan, F. Chen, G. Long, C. Zhang, and S. Y. Philip, “A
+comprehensive survey on graph neural networks,” IEEE Transactions Qiqiang Li received the Ph.D. degree in industrial
+on Neural Networks and Learning Systems, vol. 32, no. 1, pp. 4–24, automation from the Institute of Industrial Process
+2020. Control, Zhejiang University in 1998. He is a Pro-
+[33] S. Luo, L. Zhang, and Y. Fan, “Dynamic multi-objective scheduling fessor with the School of Control Science and En-
+for flexible job shop by deep reinforcement learning,” Computers & gineering and the Institute of Marine Science and
+IndustrialEngineering,vol.159,p.107489,2021. Technology,ShandongUniversity.Hisresearcharea
+[34] B. Han and J. Yang, “A deep reinforcement learning based solution focuses on modeling, optimization, and simulation
+for flexible job shop scheduling problem,” International Journal of of complex systems. His current research interests
+SimulationModelling,vol.20,no.2,pp.375–386,2021. areconcernedwitheconomicoperationoptimization
+[35] P.Brandimarte,“Routingandschedulinginaflexiblejobshopbytabu ofphotovoltaicsystems,energyefficiencyofprocess
+search,” Annals of Operations Research, vol. 41, no. 3, pp. 157–183, industryandcommercialbuildings.
+1993.
+[36] S.Yun,M.Jeong,R.Kim,J.Kang,andH.J.Kim,“Graphtransformer
+networks,”AdvancesinNeuralInformationProcessingSystems,vol.32,
+pp.11983–11993,2019.
+[37] X.Fu,J.Zhang,Z.Meng,andI.King,“Magnn:Metapathaggregated Zhiguang Cao received the B.Eng. degree in au-
+graphneuralnetworkforheterogeneousgraphembedding,”inProceed- tomation from the Guangdong University of Tech-
+ingsofTheWebConference2020,2020,pp.2331–2341. nology, Guangzhou, China, in 2009, the M.Sc. de-
+[38] D. Jin, C. Huo, C. Liang, and L. Yang, “Heterogeneous graph neural gree in signal processing from Nanyang Techno-
+networkviaattributecompletion,”inProceedingsoftheWebConference logical University (NTU), Singapore, in 2012, and
+2021,2021,pp.391–400. thePh.D.degreefromtheInterdisciplinaryGraduate
+[39] P. Velicˇkovic´, G. Cucurull, A. Casanova, A. Romero, P. Lio`, and School,NTU,in2017.HewasaResearchAssistant
+Y.Bengio,“Graphattentionnetworks,”inInternationalConferenceon ProfessorwiththeDepartmentofIndustrialSystems
+LearningRepresentations(ICLR),2018. Engineering and Management, National University
+[40] W.Kool,H.VanHoof,andM.Welling,“Attention,learntosolverouting of Singapore, Singapore, and a Research Fellow
+problems!” in International Conference on Learning Representations withtheFutureMobilityResearchLab,NTU.Heis
+(ICLR),2019. currentlyaScientistwiththeSingaporeInstituteofManufacturingTechnol-
+[41] J. Schulman, F. Wolski, P. Dhariwal, A. Radford, and O. Klimov, ogy (SIMTech), Agency for Science Technology and Research (A*STAR),
+“Proximalpolicyoptimizationalgorithms,”CoRR,vol.abs/1707.06347, Singapore. His research interests currently focus on neural combinatorial
+2017. optimization.
+[42] J. Hurink, B. Jurisch, and M. Thole, “Tabu search for the job-
+shopschedulingproblemwithmulti-purposemachines,”ORSpektrum,
+vol.15,no.4,pp.205–215,1994.
+[43] D. Behnke and M. J. Geiger, “Test instances for the flexible job shop
+schedulingproblemwithworkcenters,”Tech.Rep.,2012.
+[44] M. Montazeri and L. Van Wassenhove, “Analysis of scheduling rules
+foranfms,”TheInternationalJournalofProductionResearch,vol.28,
+no.4,pp.785–802,1990.
+[45] G.DaColandE.C.Teppan,“Industrialsizejobshopschedulingtackled
+by present day cp solvers,” in International Conference on Principles
+andPracticeofConstraintProgramming. Springer,2019,pp.144–160.
+[46] Y.-D. Kwon, J. Choo, B. Kim, I. Yoon, Y. Gwon, and S. Min,
+“Pomo: Policy optimization with multiple optima for reinforcement
+learning,”AdvancesinNeuralInformationProcessingSystems,vol.33,
+pp.21188–21198,2020.
+Wen Song received the B.S. degree in automation
+and the M.S. degree in control science and engi-
+neeringfromShandongUniversity,Jinan,China,in
+2011and2014,respectively,andthePh.D.degreein
+computer science from the Nanyang Technological
+University, Singapore, in 2018. He was a Research
+Fellow with the Singtel Cognitive and Artificial
+Intelligence Lab for Enterprises (SCALE@NTU).
+He is currently an Associate Research Fellow with
+the Institute of Marine Science and Technology,
+Shandong University. His current research interests
+include artificial intelligence, deep reinforcement learning, planning and
+scheduling,andoperationsresearch.
+© 2022 IEEE. Personal use is permitted, but republication/redistribution requires IEEE permission.(cid:13)(cid:10)See https://www.ieee.org/publications/rights/index.html for more information.
+Authorized licensed use limited to: ASTAR. Downloaded on July 12,2022 at 01:32:57 UTC from IEEE Xplore. Restrictions apply.

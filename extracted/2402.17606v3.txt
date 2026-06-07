@@ -1,0 +1,1104 @@
+
+--- PAGE 1 ---
+Learning Topological Representations with Bidirectional Graph Attention
+Network for Solving Job Shop Scheduling Problem
+CongZhang1 ZhiguangCao2 YaoxinWu3 WenSong†,4 JingSun1
+1NanyangTechnologicalUniversity,Singapore
+2SingaporeManagementUniversity,Singapore
+3DepartmentofIndustrialEngineering&InnovationSciences,EindhovenUniversityofTechnology
+4InstituteofMarineScienceandTechnology,ShandongUniversity,China
+1,4{cong.zhang92@gmail.com, wensong@email.sdu.edu.cn}
+Abstract
+theapplicationofmachinelearning(especiallydeeplearn-
+ing)techniquesholdssignificantpotentialtoadvancethe
+manufacturing industry and has become a topic of grow-
+Existing learning-based methods for solving job inginterest.Vehicleroutingproblems(VRP)Goldenetal.
+shop scheduling problems (JSSP) usually use [2008] in logistics have become increasingly popular. In
+off-the-shelfGNNmodelstailoredtoundirected contrast, the job shop scheduling problem (JSSP) Garey
+graphsandneglecttherichandmeaningfultopo- etal.[1976],whichismorecomplexbuthassubstantialap-
+logicalstructuresofdisjunctivegraphs(DGs).This plicationsinmodernproductionsystems,receivesrelatively
+paperproposesthetopology-awarebidirectional lessattention.
+graphattentionnetwork(TBGAT),anovelGNN
+In most existing research on VRP, fully connected undi-
+architecturebasedontheattentionmechanism,to
+rectedgraphsarecommonlyemployedtomodeltheinterre-
+embedtheDGforsolvingJSSPinalocalsearch
+lationshipsbetweennodes(customersandthedepot).This
+framework.Specifically,TBGATembedstheDG
+graphical representation enables a range of algorithms to
+fromaforwardandabackwardview,respectively,
+leveragegraphneuralnetworks(GNN)forlearningprob-
+wherethemessagesarepropagatedbyfollowing
+lemrepresentations,subsequentlyfacilitatingtheresolution
+the different topologies of the views and aggre-
+of VRP Kool et al. [2018], Xin et al. [2021], Joshi et al.
+gatedviagraphattention.Then,weproposeanovel
+[2022].However,thisdenselyconnectedtopologicalstruc-
+operatorbasedonthemessage-passingmechanism
+ture is not applicable to JSSP, as it cannot represent the
+to calculate the forward and backward topolog-
+widespreadprecedenceconstraintsamongoperationsina
+ical sorts of the DG, which are the features for
+job.Asaresult,themainstreamresearchonJSSPutilizes
+characterizing the topological structures and ex-
+disjunctivegraphs(DG)Błaz˙ewiczetal.[2000],asparse
+ploited by our model. In addition, we theoreti-
+anddirectedgraphicalmodel,todepictinstancesand(par-
+cally and experimentally show that TBGAT has
+tial) solutions. Presently, there are two emerging neural
+linear computational complexity to the number
+approachesforlearningtosolveJSSPbasedondisjunctive
+ofjobsandmachines,respectively,strengthening
+graphs.Thefirstneuralapproach,predominantlyfeaturedin
+our method’s practical value. Besides, extensive
+existingliterature,focusesonlearningconstructionheuris-
+experimentsonfivesyntheticdatasetsandseven
+tics, which adhere to a dispatching procedure that incre-
+classic benchmarks show that TBGAT achieves
+mentallydevelopsschedulesfrompartialonesZhangetal.
+newSOTAresultsbyoutperformingawiderange
+[2020],Parketal.[2021b,a].Nonetheless,thismethodis
+of neural methods by a large margin. All the
+ill-suitedforincorporatingdiversework-in-progress(WIP)
+code and data are publicly available online at
+information(e.g.,currentmachineloadandjobstatus)into
+https://github.com/zcaicaros/TBGAT.
+thedisjunctivegraphZhangetal.[2024].Theomissionof
+suchcrucialinformationnegativelyimpactstheperformance
+1 INTRODUCTION oftheseconstructionheuristics.Thesecondneuralapproach
+involveslearningimprovementheuristicsforJSSPZhang
+Production and logistics are integral components of con- etal.[2024],whereindisjunctivegraphsrepresentcomplete
+temporarymanufacturingsystems.Developingintelligent solutionstoberefined,effectivelytransformingtheschedul-
+solutionsforcomplexchallengesinthesedomainsthrough ing problem into a graph optimization problem so as to
+bypasstheissuesfacedbypartialschedulerepresentation.
+†correspondingauthor.
+4202
+nuJ
+5
+]GL.sc[
+3v60671.2042:viXra
+
+--- PAGE 2 ---
+(a) AJSSPinstanceofsize3×3. (b) Apossiblesolution. (c) Acriticalpathandthecriticalblockson
+it.
+Figure1:DisjunctivegraphrepresentationsforJSSPinstanceandsolution.
+A prevalent approach in the aforementioned research in- andsevenclassicbenchmarks.Comprehensiveexperimen-
+volvesutilizingcanonicalgraphneuralnetwork(GNN)mod- talresultsdemonstratethatourTBGATmodelattainsnew
+els,originallydesignedforundirectedgraphs,asthefounda- state-of-the-art(SOTA)performanceacrossalldatasets,sig-
+tionforlearningdisjunctivegraphembeddings.Wecontend nificantlysurpassingallneuralbaselines.
+thatthisapproachmaybeinadvisable.Specifically,disjunc-
+tivegraphswereinitiallyintroducedasaclassofdirected
+graphs,whereinthearcdirectionsrepresenttheprocessing 2 RELATEDLITERATURE
+orderbetweenoperations.Notably,whenmodellingcom-
+pletesolutions,disjunctivegraphstransformintodirected Therapidadvancementofartificialintelligencehasspurred
+acyclic graphs (DAGs), with their topological structures a growing interest in addressing scheduling-related prob-
+(nodeconnectivity)exhibitingabijectivecorrespondence lemsfromamachinelearning(especiallythedeeplearning)
+withthesolution(schedule)spaceBłaz˙ewiczetal.[2000].
+perspectiveDoganandBirant[2021].ForJSSP,theneural
+Learning these structures can substantially assist GNNs methodsbasedondeepreinforcementlearning(DRL)has
+inacquiringin-depthknowledgeofdisjunctivegraphs,en- emerged as the predominant machine learning paradigm.
+ablingthedifferentiationbetweenhigh-qualityandinferior ThemajorityofexistingneuralmethodsforJSSParecon-
+solutions.Nevertheless,conventionalGNNmodelsforundi- struction heuristics that sequentially construct solutions
+rectedgraphslackthecomponentsnecessarytoaccommo- throughadecision-makingprocess.L2DZhangetal.[2020]
+datethesetopologicalpeculiaritiesduringthelearningof represents a seminal and exemplary study in this area,
+representations. whereinaGIN-basedXuetal.[2019]policylearnslatent
+embeddingsofpartialsolutions,representedbydisjunctive
+Thispaperintroducesanend-to-endneurallocalsearchalgo-
+graphs,andselectsoperationsfordispatchtocorrespond-
+rithmforsolvingJSSPusingdisjunctivegraphstorepresent
+ingmachinesateachconstructionstep.Asimilardispatch-
+completesolutions.Weproposeanovelbidirectionalgraph
+ingprocedureisobservedinRL-GNNParketal.[2021b]
+attentionnetwork(TBGAT)tailoredfordisjunctivegraphs,
+and ScheduleNet Park et al. [2021a]. To incorporate ma-
+effectivelycapturingtheiruniquetopologicalfeatures.TB-
+chinestatusindecision-making,RL-GNNandScheduleNet
+GATutilizestwoindependentgraphattentionmodulesto
+introduceartificialmachinenodeswithmachine-progress
+learnforwardandbackwardviews,incorporatingforward
+informationintothedisjunctivegraph.Theseaugmenteddis-
+andbackwardtopologicalsorts.Theforwardviewpropa-
+junctivegraphsaretreatedasundirected,andatype-aware
+gatesmessagesfromtheroottotheleaf,consideringhistori-
+GNN model with two independent modules is proposed
+calcontext,whilethebackwardviewpropagatesmessages
+forextractingmachineandtasknodeembeddings.Despite
+intheoppositedirection,incorporatingfutureschedulein-
+considerableimprovementsoverL2D,theperformancere-
+formation.Weshowthatforwardtopologicalorderindis-
+mains suboptimal. DGERD Chen et al. [2022] follows a
+junctivegraphscorrespondstoglobalprocessingorderings
+procedure similar to L2D but with a Transformer-based
+and present an algorithm for efficient GPU computation.
+embedding networkVaswanietal.[2017].Arecentwork,
+Fortraining,wedesignadeepreinforcementlearning-based
+MatNetKwonetal.[2021],employsanencoding-decoding
+algorithm(DRL),particularlytheREINFORCEalgorithm
+frameworkforlearningconstructionheuristicsforflexible
+with entropy regularization to train the TBGAT network.
+flow shop problems; however, its assumption of indepen-
+TheoreticalanalysisandexperimentsdemonstrateTBGAT’s
+dentmachinegroupsforoperationsateachstageisoverly
+linearcomputationalcomplexityconcerningthenumberof
+restrictiveforJSSP.JSSenvTasseletal.[2021]presentsa
+jobsandmachines,akeyattributeforpracticalJSSPsolving.
+carefullydesignedandwell-optimizedsimulatorforJSSP,
+Weevaluateourproposedmethodagainstarangeofneu- extendingfromtheOpenAIgymenvironmentsuiteBrock-
+ral approaches for JSSP, utilizing five synthetic datasets manetal.[2016].Ratherthanutilizingdisjunctivegraphs,
+
+--- PAGE 3 ---
+Initial solution
+N
+Stop criterion
+Candidate e
+w
+satisfied?
+moves s
+o
+Topological-aware
+lu
+tio
+Y N bidirectional gragh n
+attention network
+Construct Disjunctive (TBGAT)
+neighborhood with graph with
+neighborhood topological
+move
+Best solution structure features
+Figure2:ThelocalsearchprocedurewithTBGATnetwork.
+JSSenvmodelsandrepresentspartialschedulestatesusing cessed by each machine m ∈ M following a predefined
+GanttchartsJainandMeeran[1999],andalsoproposesa orderO →···→O →···→O ,whereO ∈O
+j1 ji j|M| ji
+DRLagenttosolveJSSPinstancesindividuallyinanonline representstheithoperationofjobj.EachoperationO is
+ji
+fashion.However,itsonlinenature,requiringtrainingfor allocatedtoamachinem withaprocessingtimep ∈N.
+ji ji
+each instance, results in slower computation than offline- Let O and O denote the collections of all operations
+j m
+trainedmethods. forjobj andmachinem,respectively.TheoperationO
+ji
+canbeprocessedonlywhenallitsprecedingoperationsin
+L2S Zhang et al. [2024] significantly narrows the opti-
+{O |k <i}⊂O havebeencompleted,whichconstitutes
+malitygapsbylearningneuralimprovementheuristicsfor jk j
+theprecedentconstraint.Theobjectiveistoidentifyasched-
+JSSP,therebytransformingtheschedulingproblemintoa
+ule η : O → N, i.e., the starting time for each operation,
+graphstructuresearchproblem.Specifically,L2Semploys
+thatminimizesthemakespanC =max(η(O )+p )
+astraightforwardlocalsearchframeworkinwhichaGNN- max ij ij
+withoutviolatingtheprecedentconstraints.
+basedagentlearnstoselectpairsofoperationsforswapping,
+thus yielding new solutions. The GNN architecture com-
+prises two modules based on GIN Xu et al. [2019] and 3.2 THEDISJUNCTIVEGRAPH
+GATVelicˇkovic´ etal.[2018],focusingonthedisjunctive REPRESENTATION.
+graphanditssubgraphswithdifferentcontextsseparately.
+This design introduces two potential issues. Firstly, it is DisjunctivegraphsBłaz˙ewiczetal.[2000]cancomprehen-
+unclear whether GIN can maintain the same discrimina- sivelyrepresentJSSPinstancesandsolutions.Asillustrated
+tive power for directed graphs as for undirected graphs. in Fig. 1(a), a 3×3 JSSP instance is represented by its
+Secondly,theGATnetworkcannotallocatedistinctatten- corresponding disjunctive graph G = ⟨O,C,D⟩. The ar-
+tionscorestodifferentneighboursduringtherepresentation tificial operations O ∈ O and O ∈ O, which possess
+S T
+learning since each node possesses only a single neigh- zeroprocessingtime,denotethestartandendofthesched-
+bourineithercontextsubgraph,thusrenderingtheattention ule,respectively.Thesolidarrowsrepresentconjunctions
+mechanismineffective. (C),whichindicateprecedentconstraintsforeachjob.The
+two-headedarrowssignifydisjunctions(D)thatmutually
+Existingattention-basedGNNvariantsarereadilyavailable
+connectalloperationsbelongingtothesamemachine,form-
+toembedDGs,e.g.,Wangetal.[2019].However,theyei-
+ingmachinecliqueswithdistinctcolors.Discoveringaso-
+theradoptarandom-walk-basedapproachforaggregating
+lutionistantamounttoassigningdirectionstodisjunctive
+the neighbourhood information Iyer et al. [2021], which
+arcssuchthattheresultinggraphisadirectedacyclicgraph
+neglectstheprecedentconstraintsandmachineprocessing
+(DAG)Balas[1969].Forinstance,asolutiontotheJSSP
+ordersleadingtoinferiorperformance,orthecomputational
+instance in Fig. 1(a) is presented in Fig. 1(b), where the
+complexityisnotlinear(w.r.t.thenumberofjobsandma-
+directions of all disjunctive arcs are determined, and the
+chines),makingthemlesssuitableforJSSP.
+resulting graph is a DAG. Fig. 1(c) emphasizes a critical
+pathofthesolutioninFig.1(b),i.e.,thelongestpathfrom
+3 PREREQUISITE
+thesourcenodeO tothesinknodeO ,withcriticalblocks
+S T
+denotedbyredframes(bylongestwemeanthetotalpro-
+3.1 THEJOBSHOPSCHEDULINGPROBLEM. cessingtimeofalloperationsalongthepath,exceptO and
+S
+O , is the largest among all paths from O to O ). The
+T S T
+AJSSPinstanceofsize|J|×|M|comprisesasetofjobs critical blocks are groups of operations belonging to the
+J andasetofmachinesM.Eachjobj ∈J mustbepro- samemachineonacriticalpath.Thesumoftheprocess-
+
+--- PAGE 4 ---
+ing times of operations along the critical path represents transitionisceased.
+the makespan of the solution. Identifying a solution with
+a smaller makespan is equivalent to finding a disjunctive Swap the last
+graphwithashortercriticalpath. Operation two operations
+4 THELOCALSEARCHALGORITHM
+WITHPROPOSEDTBGATNETWORK Critical Block
+Swap the first
+WeadoptaneurallocalsearchframeworkakintoL2SZhang two operations
+etal.[2024],asdepictedinFig.2.Theprocesscommences
+withaninitialsolutionproducedbyaconstructionheuristic Figure3:TheN neighborhoodstructure.
+5
+(e.g.,thedispatchingrule),whichispreservedasthecurrent
+seed and the incumbent (the best-so-far solution). Subse-
+quently,thedisjunctivegraphrepresentationofthepresent 4.1 THEFORWARDANDBACKWARDVIEWSOF
+seedisconstructed,andthecandidatemoves(neighbours) DGS
+aredeterminedbyemployingtheN neighbourhoodstruc-
+5
+tureNowickiandSmutnicki[1996].Thisstructuregenerates Disjunctive graphs (DGs) constitute a specific class of
+acandidatesolutionbyexchangingthefirstorlastpairof DAGs,exhibitinguniquefeatures.Firstly,byadheringto
+operationsinacriticalblockalongacriticalpathofthedis- thedirectionofconjunctiveanddisjunctivearcs,eachnode
+junctivegraph,asdemonstratedinFig.3.FollowingNow- O (barringO andO )hasneighboursfromtwodirec-
+ji S T
+icki and Smutnicki [1996], the first pair of operations in tions. Namely, the predecessors pointing to O and suc-
+ji
+the initial critical block and the last pair of operations in cessors pointing from O . Nevertheless, existing GNN-
+ji
+the final critical block are excluded. Furthermore, in the basedmodelseitherneglectthelatterneighborsZhangetal.
+presenceofmultiplecriticalpaths,arandomcriticalpathis [2020,2024]orfailtodifferentiatetheorientationsofneigh-
+chosenZhangetal.[2024],NowickiandSmutnicki[1996]. bors Park et al. [2021b]. In contrast, we recognize that
+TheTBGATnetworksubsequentlyingeststhedisjunctive neighbours from both directions are crucial and contain
+graphofthecurrentseedasinputandproducesoneofthe complementaryinformation.Secondly,anyO inasched-
+ji
+candidatemoves.Ultimately,anewseedsolutionisacquired ulecannotcommenceprocessingearlierthanitspredeces-
+byswappingtheoperationsinthedisjunctivegraphaccord- sors,owingtotheprecedentconstraintsandthedetermined
+ingtotheselectedoperationpair,supersedingtheincumbent machineprocessingorder.Theearliesttimestampatwhich
+ifsuperior.Thissearchprocedurepersistsuntilastopping O maybeginwithoutviolatingtheseconstraintsisdefined
+ji
+criterionismet,suchasreachingapredeterminedhorizon, as the earliest starting time EST . However, O is not
+ji ji
+e.g.,5000steps. mandated to start precisely at EST if not delaying the
+ji
+overall makespan. Instead, it has the latest starting time,
+Theaforementionedlocal searchprocedurecanbe recast
+denotedasLST .TheEST andLST collectivelyde-
+intheframeworkoftheMarkovdecisionprocess(MDP). ji ji ji
+termine a schedule, which can be calculated recursively
+Specifically, the state, action, reward, and state transition
+fromaforwardandbackwardperspectiveofthedisjunctive
+aredelineatedasfollows.
+graph Jungnickel and Jungnickel [2005], respectively, as
+State.Thestates
+t
+attimesteptrepresentsthedisjunctive
+follows,
+graphrepresentationoftheseedsolutionatt.Action.The
+actionsetA attcomprisesthecandidatemovesofs calcu-
+t t
+latedbyapplyingtheN neighborhoodstructure.Itisworth EST ji = max (EST nl +p nl ), (1)
+noting that A may be
+5
+dynamic and contingent on differ-
+Onl∈POji
+t
+entseedsolutions,whereA =∅indicatesthatthecurrent
+t
+LST = min (LST −p ), (2)
+seed solution is the optimal one Nowicki and Smutnicki ji nl nl
+Onl∈SOji
+[1996]. Reward. The step-wise reward between any two
+whereP andS representthesetsofpredecessorsand
+consecutivestatess ands iscomputedasr(s ,a ) = Oji Oji
+t t+1 t t successorsofO ,respectively.Intheforwardperspective,
+max(C (s∗)−C (s ),0),withs∗denotingthein- ji
+max max t+1 thecomputationtraverseseachO byadheringtothedirec-
+cumbent.Thisiswell-defined,asmaximizingthecumula- ji
+tionsofconjunctiveanddisjunctivearcs,whichareinverted
+tiverewardistantamounttomaximizingtheimprovementto
+theinitialsolution,since
+(cid:80)T
+r =C (s )−C (s ).
+inthebackwardperspective.Anillustrationoftheforward
+t t max 0 max T andbackwardperspectivesofmessageflowisdemonstrated
+Statetransition.Thestates deterministicallytransitsto
+t inFig.4.
+thesubsequentstates byexecutingtheselectedaction
+t+1
+a ∈ A at s , i.e., exchanging the operation pair in s . Theprocessingorderofoperationsintrinsicallydetermines
+t t t t
+TheepisodeterminatesifA = ∅,beyondwhichthestate the quality of a schedule, as it defines the message flows
+t
+
+--- PAGE 5 ---
+←−
+O is a prerequisite operation of O , then Φ(O ) >
+ji mk ji
+←− ←−
+The backward view Φ(O )andLST >LST ,where Φ :O →Zisthe
+mk ji mk
+Disjunctive arcs topologicalsortcalculatedfromthebackwardviewofthe
+disjunctivegraph.
+The proof is in Appendix B. Our GNN model leverages
+forwardandbackwardtopologicalsortstolearnlatentrepre-
+Conjunctive arcs
+sentationsofdisjunctivegraphs.Thesesortscapturegraph
+The forward view topologyandglobalprocessingorders(Lemma1andCorol-
+lary1).However,traditionalalgorithmsforthesesortspose
+challenges for DRL agent training due to batch process-
+Figure4:TheforwardandbackwardviewoftheDG.
+ingcomplexities,GPU-CPUcommunicationoverhead,and
+DRLdatainefficiency.Toovercometheseissues,wepro-
+poseMPTS,anovelalgorithmbasedonamessage-passing
+ofbothforwardandbackwardperspectives,representedby
+mechanisminspiredbyGNNcomputation.MPTSfacilitates
+theconnectionsofnodesandtheorientationsofarcswithin
+batch computation of forward and backward topological
+thegraph,i.e.,thegraphtopology.Furthermore,aone-to-
+sorts,ensuringcompatibilitywithGPUprocessingformore
+onecorrespondenceexistsbetweenthespaceofdisjunctive
+efficienttraining.
+graph topologies and the space of feasible schedules. In
+otherwords,eachpairofdisjunctivegraphspossessingdis- In fact, MPTS is universally applicable to any directed
+tincttopologiescorrespondstoschedulesofdifferingqual- acyclic graph (DAG). Specifically, given a DAG =
+ities.Hence,enablingtheagenttoleveragesuchtopologi- ⟨O∗,E∗⟩ with O∗ and E∗ denoting the sets of nodes and
+calfeaturestolearndiscriminativeembeddingsforvarious arcs,respectively.LetO¯ ⊂O∗bethesetofnodeswithzero
+schedulesishighlyadvantageous,asitaidsindistinguish- in-degrees, and O˜ = O∗ \O¯ be the set of the remaining
+ingsuperiorschedulesfrominferiorones.Toachievethis, nodes, where O˜′ ⊂ O˜ is the set of nodes with zero out-
+weemploythetopologicalsortWangetal.[2009],apar- degrees.Weassignamessagemt toeachnodeO ∈O∗,
+x x
+tialorderofnodesinaDAGthatdepictstheirconnectivity initializedasm0 = 1fornodesO ∈ O¯ andm0 = 0for
+x¯ x¯ x˜
+dependencies,asthetopologicalfeatures.Theformaldefini- nodesO ∈O˜.Next,wedefineamessage-passingoperator
+x˜
+tionofthetopologicalsortofnodesinthedisjunctivegraph MPO : mt → mt+1, which calculates and updates the
+x x
+isprovidedinDefinition1below. message for each node O as mt+1 = max (mt),
+x x Oy∈Nx y
+where N is a neighborhood of O containing all nodes
+Definition1. (topologicalsort)Givenanydisjunctivegraph x x
+G=⟨O,C,D⟩,thereisatopologicalsortΦ:O →Zsuch
+O
+y
+pointingtoO
+x
+.Finally,letLdenotethelengthofthe
+globallongestpathinDAG,andL representthelength
+thatforanypairofoperationsOandO′ ifthereisanarc x
+ofanylongestpathfromnodesinthesetO toO ,wecan
+(disjunctiveorconjunctive)connectingthemasO → O′, x¯ x
+demonstratethefollowing.
+thenΦ(O)<Φ(O′)musthold.
+Theorem1. AfterapplyingMPOforL x times,mL x x = 1
+Furthermore,withinthecontextofJSSP,foranytwoopera- for all nodes O ∈ O. Moreover, for any pair of nodes
+x
+tionsO,O′ ∈O,ifOisaprerequisiteoperationofO′,that O and O connected by a path, if L < L ≤ L then
+x z x z
+is,OmustbeprocessedpriortoO′,thenOisrequiredto Φ(O )<Φ(O ).
+x z
+haveahigherrankingthanO′inthetopologicalsort.This
+demonstratesthatthetopologicalsortservesasanalterna-
+The proof is in Appendix C. Theorem 1 suggests an effi-
+tiverepresentationdepictingtheprocessingordersdefined
+cientmethodforcomputingthetopologicalsort,inwhich
+bytheprecedentconstraintsandtheprocessingsequenceof wecaniterativelyapplytheMPOonanyDAGandgather
+machines.Formally, thenodesO withmt =1ateachiteration0≤t≤|O∗|.
+x x
+Consequently,nodescollectedinearlieriterationsmusthold
+Lemma1. ForanytwooperationsO ,O ∈O,ifO is
+ji mk ji
+→− →− higherranksthanthoseinlateriterationswithinthetopolog-
+aprerequisiteoperationofO ,then Φ(O )< Φ(O )
+mk →− ji mk icalsort.Sincedisjunctivegraphsalsobelongtotheclass
+andEST <EST ,where Φ :O →Zisthetopologi-
+ji mk of DAGs, Theorem 1 can be directly applied to compute
+calsortcalculatedfromtheforwardviewofthedisjunctive →−
+theforwardtopologicalsort Φ,asstatedinLemma1,and
+graph. ←−
+the backward topological sort Φ, as indicated in Corol-
+lary 1, respectively. Given that the MPO operator can be
+TheproofisinAppendixA.Aparallelconclusioncanbe
+readily implemented on a GPU to leverage its powerful
+derivedforthebackwardviewofthedisjunctivegraph,as
+parallelcomputationcapabilities,MPOisanticipatedtobe
+presentedbelow.
+more efficient than traditional algorithms when handling
+Corollary 1. For any two operations O ,O ∈ O, if multiple disjunctive graphs concurrently. To substantiate
+ji mk
+
+--- PAGE 6 ---
+Forward view of the
+disjunctive graph
+E f m ro N b m e o d d F d e E i M ng M E e m rg b e e d d d N in o g d e U E lt m im b a e t d e d N in o g de E P a r c o N h b o a C d b e a i l n P it d y a i i d F r a o t r e Output:
+FEM New Solution
+Action Sampled
+Concatenate P M oo e l a in n g Concatenate S N e e l t e w ct o io rk n So L f a t y M er ax Node Pair
+BEM
+E f m ro N b m e o d d B d e E in M g Em G b r e a d p d h ing Ea S c N h c o o C d r e e a s n P d F a i o i d r r ate
+Backward view of the
+disjunctive graph
+Figure5:Thearchitectureofthepolicynetwork.
+thisassertion,weprovideanempiricalcomparisoninthe ofnodeO intheforwardembeddingmodule(FEM).Inspe-
+x
+experimentalsection. cific,αl andαl aretheattentionscoresforthemessages
+x,x x,y
+ofnodeO itselfanditsneighborO ,respectively;θl and
+x y ag
+N(x)denotethelearnableparametersfortheaggregation
+4.2 GRAPHEMBEDDINGWITHTBGAT
+operator and the neighborhood of node O , respectively.
+x
+Particularly,thetwoattentionscoresarecomputedthrough
+Inordertoeffectivelylearngraphembeddingsbyleveraging
+awidely-usedpracticeingraphneuralnetworksasfollows,
+thetopologicalfeaturesofdisjunctivegraphs,weintroduce
+anovelbidirectionalgraphattentionnetworkdesignedto (cid:16) (cid:16) →− →− (cid:17)(cid:17)
+exp LReLU [al]⊤[θl hl ∥θl hl]
+embedtheforwardandbackwardviewsofthedisjunctive at x at ∗
+αl = ,
+graph using two independent modules, respectively. For x,∗ (cid:80) exp (cid:16) LReLU (cid:16) [al]⊤[θl →− hl ∥θl →− hl] (cid:17)(cid:17)
+eachview,messagepropagationadherestothetopologyof k∈N′(Ox) at x at k
+(4)
+respectiveview,andaggregationisaccomplishedthroughan
+attentionmechanism,whichdistinguishourmodelfrompre- where||denotestheconcatenationoperator;∗referstoxor
+viousworks.Theoverarchingarchitectureoftheproposed y;N′(O ) = N(O )∪{O };LReLUistheLeakyRelU
+x x x
+TBGATisdepictedinFig.5. layerRadfordetal.[2015];andal andθl arethelearnable
+at
+parameters.
+4.2.1 Theforwardembeddingmodule
+4.2.2 Thebackwardembeddingmodule
+In the forward view of the disjunctive graph, each node
+O x ∈O →− isassociatedwith →− athree-dimensionalrawfeature Thebackwardembeddingmodule(BEM)hasanarchitec-
+vector h0 x = (p x ,est x , Φ x ) ∈ R3. Here, p x represents turethatissimilartothatoftheforwardembeddingmodule.
+theprocessingtime →− ofnodeO x ,est x representstheearliest However,thereisakeydifferenceintherawfeatureused
+starting time, and Φ represents the forward topological foreachnode.Specifically,therawfeatureforeachnode
+x
+sortofnodeO .Theforwardembeddingmodule(FEM)is O is substituted with the backward hidden state vector
+x ←−x ←−
+agraphneuralnetworkthatconsistsofLlayers.Eachlayer h0 = (p ,lst , Φ ) ∈ R3,wherep representsthepro-
+x x x x x
+producesanewmessageforanodebyaggregatingthemes- cessingtimeofnodeO ,lst representsthelateststarting
+←−x x
+sagesofthisnodeanditsneighboursfromthepreviouslayer. timeofnodeO ,and Φ representsthebackwardtopologi-
+x x
+Theaggregationoperatorusedforupdatingthemessageof calsortofnodeO .Thisallowsthebackwardembedding
+x
+node O x is a weighted sum, where the weights are deter- moduletoencodetheinformationaboutthetemporaldepen-
+minedbyattentionscoresthatindicatetheimportanceof denciesbetweennodesinthereverseorderoftheforward
+eachmessage.Inotherwords,theaggregationoperatorfor embeddingmodule.
+updatingthemessageofnodeO isexpressedasfollows,
+x
+4.2.3 Mergingtheforwardandbackwardembeddings
+→− →− (cid:88) →−
+hl+1 =αl θl hl + αl θl hl,0≤l≤L−1.
+x x,x ag x x,y ag y The merged embedding for a given node O is derived
+x
+Oy∈N(Ox) byconcatenatingtheoutputvectorofthelastlayerofthe
+(3)
+forwardembeddingmodule(FEM)andthelastlayerofthe
+The above attention scores αl and αl are used as backward embedding module (BEM), which results in a
+x,x x,y
+weightsintheaggregationoperatorforupdatingthemessage singlevectorthatencodesboththeforwardandbackward
+
+--- PAGE 7 ---
+Table1:Performanceonclassicbenchmarks.“Gap”:theaveragegaptothebestknownsolutionsreportedintheprevious
+literature.“Time”:theaveragetimeforsolvingasingleinstanceinseconds(“s”),minutes(“m”),orhours(“h”).Forthe
+neuralmethods,thebestresultsaremarkedinbold,wheretheglobalbestresultsarecoloredblue.
+Taillard ABZ FT
+Method 15×15 20×15 20×20 30×15 30×20 50×15 50×20 100×20 10×10 20×15 6×6 10×10 20×5
+Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time
+CP-SATPerronandFurnon 0.1%7.7m 0.2% 0.8h 0.7% 1.0h 2.1% 1.0h 2.8% 1.0h 0.0% 0.4h 2.8% 0.9h 3.9% 1.0h 0.0% 0.8s 1.0% 1.0h 0.0% 0.1s 0.0% 4.1s 0.0% 4.8s
+L2DZhangetal.[2020] 24.7% 0.4s30.0% 0.6s28.8% 1.1s30.5% 1.3s32.9% 1.5s20.0% 2.2s23.9% 3.6s12.9% 28.2s14.8% 0.1s24.9% 0.6s14.5% 0.1s21.0% 0.2s36.3% 0.2s
+RL-GNNParketal.[2021b] 20.1% 3.0s24.9% 7.0s29.2%12.0s24.7%24.7s32.0%38.0s15.9% 1.9m21.3%3.2m 9.2%28.2m10.1% 0.5s29.0% 7.3s29.1% 0.1s22.8% 0.5s14.8% 1.3s
+ScheduleNetParketal.[2021a]15.3% 3.5s19.4% 6.6s17.2%11.0s19.1%17.1s23.7%28.3s13.9% 52.5s13.5%1.6m 6.7% 7.4m 6.1% 0.7s20.5% 6.6s 7.3% 0.2s19.5% 0.8s28.6% 1.6s
+L2S-500Zhangetal.[2024] 9.3% 9.3s11.6%10.1s12.4%10.9s14.7%12.7s17.5%14.0s11.0% 16.2s13.0%22.8s 7.9% 50.2s 2.8% 7.4s11.9%10.2s 0.0% 6.8s 9.9% 7.5s 6.1% 7.4s
+TBGAT-500 8.0%12.6s 9.9%14.6s10.0%17.5s13.3%17.2s16.4%19.3s 9.6% 23.9s11.9%24.4s 6.4% 42.0s 1.1% 9.2s11.8%12.8s 0.0% 7.4s 5.2%10.3s 2.7%11.7s
+LA SWV ORB YN
+Method 10×5 15×5 20×5 10×10 15×10 20×10 30×10 15×15 20×10 20×15 50×10 10×10 20×20
+Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time
+CP-SATPerronandFurnon 0.0% 0.1s 0.0% 0.2s 0.0% 0.5s 0.0% 0.4s 0.0%21.0s 0.0%12.9m 0.0%13.7s 0.0% 30.1s 0.1% 0.8h 2.5% 1.0h 1.6% 0.5h 0.0% 4.8s 0.5% 1.0h
+L2DZhangetal.[2020] 14.3% 0.1s 5.5% 0.1s 4.2% 0.2s21.9% 0.1s24.6% 0.2s24.7% 0.4s 8.4% 0.7s27.1% 0.4s41.4% 0.3s40.6% 0.6s30.8% 1.2s31.8% 0.1s22.1% 0.9s
+RL-GNNParketal.[2021b] 16.1% 0.2s 1.1% 0.5s 2.1% 1.2s17.1% 0.5s22.0% 1.5s27.3% 3.3s 6.3%11.3s21.4% 2.8s28.4% 3.4s29.4% 7.2s16.8%51.5s21.8% 0.5s24.8%11.0s
+ScheduleNetParketal.[2021a]12.1% 0.6s 2.7% 1.2s 3.6% 1.9s11.9% 0.8s14.6% 2.0s15.7% 4.1s 3.1% 9.3s16.1% 3.5s34.4% 3.9s30.5% 6.7s25.3%25.1s20.0% 0.8s18.4%11.2s
+L2S-500Zhangetal.[2024] 2.1% 6.9s 0.0% 6.8s 0.0% 7.1s 4.4% 7.5s 6.4% 8.0s 7.0% 8.9s 0.2%10.2s 7.3% 9.0s29.6% 8.8s25.5% 9.7s21.4%12.5s 8.2% 7.4s12.4%11.7s
+TBGAT-500 2.1% 2.3s 0.0% 0.9s 0.0% 1.7s 1.8% 9.1s 3.6%10.8s 5.0% 11.4s 0.0% 4.9s 5.5% 12.1s23.0%15.6s23.7%17.0s20.3%29.8s 7.0%10.4s 9.6%14.3s
+Table2:Generalizationperformanceonclassicbenchmarks.“Gap”:theaveragegaptothebestknownsolutionsreportedin
+thepreviousliterature.“Time”:theaveragetimeforsolvingasingleinstanceinseconds(“s”),minutes(“m”),orhours(“h”).
+Fortheneuralmethods,thebestresultsaremarkedinbold,wheretheglobalbestresultsarecoloredblue.
+Taillard ABZ FT
+Method 15×15 20×15 20×20 30×15 30×20 50×15 50×20 100×20 10×10 20×15 6×6 10×10 20×5
+GapTime Gap Time Gap Time Gap Time Gap TimeGap Time Gap TimeGapTime Gap Time Gap Time Gap TimeGapTime Gap Time
+CP-SATPerronandFurnon 0.1%7.7m 0.2% 0.8h 0.7% 1.0h 2.1% 1.0h 2.8% 1.0h0.0% 0.4h 2.8% 0.9h3.9% 1.0h 0.0% 0.8s 1.0% 1.0h 0.0% 0.1s0.0% 4.1s 0.0% 4.8s
+L2S-1000Zhangetal.[2024]8.6%18.7s10.4%20.3s11.4%22.2s12.9%24.7s15.7%28.4s9.0% 32.9s11.4%45.4s6.6%1.7m 2.8%15.0s11.2%19.9s 0.0%13.5s8.0%15.1s 3.9%15.0s
+L2S-2000Zhangetal.[2024]7.1%37.7s 9.4%41.5s10.2%44.7s11.0%49.1s14.0%56.8s6.9% 65.7s 9.3%90.9s5.1%3.4m 2.8%30.1s 9.5%39.3s 0.0%27.2s5.7%30.0s 1.5%29.9s
+L2S-5000Zhangetal.[2024]6.2%92.2s 8.3%1.7m 9.0%1.9m 9.0%2.0m12.6%2.4m4.6% 2.8m 6.5%3.8m3.0%8.4m 1.4%75.2s 8.6%99.6s 0.0%67.7s5.6%74.8s 1.1%73.3s
+TBGAT-1000 6.1%24.9s 8.7%28.7s 9.0%34.1s10.9%33.7s14.0%37.3s7.5% 46.9s 9.4%47.5s4.9%82.3s 1.1%17.9s10.1%25.3s 0.0%14.2s4.8%20.5s 1.1%23.2s
+TBGAT-2000 5.1%49.7s 7.3%56.5s 7.9%67.0s 9.4%65.9s12.1%72.3s5.6% 92.9s 7.5%93.7s3.0%2.7m 1.1%35.5s 7.1%50.0s 0.0%28.0s4.7%41.2s 0.8%45.8s
+TBGAT-5000 4.6%2.1m 6.3%2.3m 7.0%2.7m 6.8%2.7m 9.7%2.9m2.6% 3.9m 5.0%3.9m1.2%6.7m 0.8%88.2s 6.6%2.1m 0.0%69.4s2.9%1.7m 0.0%1.9m
+LA SWV ORB YN
+Method 10×5 15×5 20×5 10×10 15×10 20×10 30×10 15×15 20×10 20×15 50×10 10×10 20×20
+GapTime Gap Time Gap Time Gap Time Gap TimeGap Time Gap TimeGapTime Gap Time Gap Time Gap TimeGapTime Gap Time
+CP-SATPerronandFurnon 0.0% 0.1s 0.0% 0.2s 0.0% 0.5s 0.0% 0.4s 0.0%21.0s0.0%12.9m 0.0%13.7s0.0%30.1s 0.1% 0.8h 2.5% 1.0h 1.6% 0.5h0.0% 4.8s 0.5% 1.0h
+L2S-1000Zhangetal.[2024]1.8%14.0s 0.0%13.9s 0.0%14.5s 2.3%15.0s 5.1%16.0s5.7% 17.5s 0.0%20.4s6.6%18.2s24.5%17.6s23.5%19.0s20.1%25.4s6.6%15.0s10.5%23.4s
+L2S-2000Zhangetal.[2024]1.8%27.9s 0.0%28.3s 0.0%28.7s 1.8%30.1s 4.0%32.2s3.4% 34.2s 0.0%40.4s6.3%35.9s21.8%34.7s21.7%38.8s19.0%49.5s5.7%29.9s 9.6%47.0s
+L2S-5000Zhangetal.[2024]1.8%70.0s 0.0%71.0s 0.0%73.7s 0.9%75.1s 3.4%80.9s2.6% 85.4s 0.0%99.3s5.9%88.8s17.8%86.9s17.0%99.8s17.1%2.1m3.8%75.9s 8.7%1.9m
+TBGAT-1000 1.6% 3.1s 0.0% 1.9s 0.0% 3.3s 1.8%18.2s 3.5%21.4s4.0% 22.8s 0.0% 6.3s5.3%24.5s19.2%31.2s20.1%34.3s18.5%59.5s5.7%20.8s 8.0%28.1s
+TBGAT-2000 1.5% 4.8s 0.0% 3.7s 0.0% 6.5s 1.6%36.7s 3.0%42.4s2.9% 43.9s 0.0% 8.9s5.1%48.9s14.6%61.7s18.1%67.6s16.6%2.0m5.1%41.8s 7.0%55.8s
+TBGAT-5000 1.5% 9.8s 0.0% 9.2s 0.0%16.1s 1.4%93.1s 2.4%1.8m2.1% 52.0s 0.0%16.9s4.4%2.0m11.1%2.5m15.7%2.7m14.5%4.9m4.5%1.7m 5.7%2.3m
+temporaldependenciesofthenodeas Giventhenodeembeddingsh andagraphembeddingh ,
+x G
+wecalculatea“score”forselectingeachoperationpairin
+→− ←− theN neighborhoodstructureasfollows.Foranypairof
+hL = hL||hL,forallO . (5) 5
+x x x x operations (O ,O ) obtained from the N neighborhood
+x z 5
+structure,wefirstconcatenatethecorrespondingnodeem-
+Moreover,weconcatenatehL withthegraphembeddingto
+x beddingsh x andh z toobtainthejointrepresentationh xz
+formtheultimateembeddingforeachnodeas
+fortheaction(O ,O ).Wethenfeedh intotheactionse-
+x z xz
+lectionnetworkNet ,i.e.,amulti-layerperceptron(MLP)
+A
+h =hL||h ,forallO , (6) with L A hidden layers, to obtain a scalar score sc xz for
+x x G x
+theaction(O ,O ).Thescoresc isthennormalizedto
+x z xz
+obtainaprobabilityp ,fromwhichwecouldsamplean
+where h is obtained with the mean pooling of the node xz
+G
+embeddingsash = 1 (cid:80) h . action.
+G |O| Ox∈O x
+Theorem2. TheTBGATnetworkhaslineartimecomplexity
+w.r.tboth|J|and|M|.
+4.3 ACTIONSELECTION
+
+--- PAGE 8 ---
+ByfollowingtheproofofTheorem4.1inpaperZhangetal. theresultsontheseclassicdatasetscanbeconsideredthe
+[2024],itisnotdifficulttoseethattheFEMmoduleand zero-shot generalization performance of our method. We
+the BEM modules pose linear computational complexity. testthemodeltrainedontheclosestsizeforeachproblem
+Then, since the action selection network is an MLP that size,e.g.,themodeltrainedonthesizeof10×10isused
+is, of course, linear to |J| and |M|, TBGAT has linear fortestingontheproblemofsize10×10orotherscloseto
+computationalcomplexityregardingthenumberofjobs|J| it.
+andthenumberofmachines|M|,respectively. □
+Baselines.Inordertodemonstratethesuperiorperformance
+ofTBGAT,weconductacomparativeanalysisagainstnine
+different baseline methods of various genres, including
+eightstate-of-the-artneuralapproachessuchasconstruction
+4.4 THEENTROPY-REGULARIZEDREINFORCE
+heuristics (L2D Zhang et al. [2020], RL-GNN Park et al.
+ALGORITHM
+[2021b],ScheduleNetParketal.[2021a],ACLIklassovetal.
+[2022],JSSEnvTasseletal.[2021],andDGERDChenetal.
+Totrainourpolicynetwork,weutilizeamodifiedversionof
+[2022]),improvementheuristic(L2SZhangetal.[2024]),
+theREINFORCEalgorithmproposedbyWilliamsWilliams
+andactivesearch(EASKwonetal.[2021]).Wealsoinclude
+[1992].Ourmodificationsincludeperiodicupdatesofthe
+anexactsolver,CP-SATPerronandFurnon,whichhasbeen
+policy network parameters, as opposed to updating them
+shown to be robust and effective in solving JSSP Da Col
+onlyatafixedsteplimitT.Thisapproachhasbeenshown
+and Teppan [2019] when given sufficient computational
+toimprovethegeneralizationofthepolicynetworktolarger
+time(3600seconds).Foreachproblemsize,wereportthe
+valuesofT duringtestingZhangetal.[2024].Additionally,
+performance of our method in terms of the average rela-
+toencourageexplorationoftheactionspace,weincorporate
+tive gap to the best-known solutions, which are available
+aregularizationtermH(π ) = −E log(π (a))based
+θ a∼πθ θ online(forthesevenclassicbenchmarkdatasets)orcom-
+ontheentropyofthepolicyπ intotheoriginalobjectiveof
+θ putedoptimallywithCP-SAT(forthesyntheticevaluation
+theREINFORCEalgorithm.Thecompletelearningproce-
+dataset).†Forthesyntheticdatasets,wecompareourresults
+dureisoutlinedinAlgorithm1inAppendixD.
+againsttheoptimalsolutionobtainedusingCP-SAT.The
+5 EXPERIMENT averagerelativegapiscalculatedbyaveragingthegapof
+eachinstance,whichisdefinedasfollows,
+TocomprehensivelyevaluatetheperformanceofourTB-
+GAT,weconductaseriesofexperimentsonbothsynthetic σ =(C −C∗ )/C∗ ×100%, (7)
+max max max
+andpubliclyavailabledatasets.
+where C∗ is the best-known solution (for the classic
+max
+benchmark datasets) or the optimal solution (for the syn-
+5.1 EXPERIMENTALSETUP
+theticdatasets).
+ThealgorithmconfigurationscanbefoundinAppendixE.
+5.2 TESTINGDATASETSANDBASELINES 5.3 PERFORMANCEONPUBLICBENCHMARKS
+Datasets. We evaluate the performance of our proposed We present the results on public datasets. To present the
+method on two categories of datasets. The first category evaluation results more clearly, we report the results for
+comprises synthetic datasets that we generated using the 500 improvement steps in Table 1 and the generalization
+samemethodasthetrainingdataset.Thesyntheticdataset resultsfordifferentnumbersofimprovementstepsinTa-
+includesfivedifferentsizes,namely10×10,15×10,15×15, ble2.Inadditiontothebaselinesmentionedearlier,wealso
+20×10,and20×15,eachconsistingof100instances.The includeRL-GNNParketal.[2021b]andScheduleNetPark
+secondcategoryincludessevenwidelyusedpublicbench- et al. [2021a] for comparison. The tables show that TB-
+mark datasets, i.e., Taillard Taillard [1993], ABZ Adams GATperformswellwhengeneralizedtopublicbenchmarks.
+etal.[1988],FTFisher[1963],LALawrence[1984],SWV Specifically,TBGATachievesthebestperformanceforall
+Storeretal.[1992],ORBApplegateandCook[1991],and problemsizesanddatasets,outperformingCP-SATwitha
+YN Yamada and Nakano [1992]. These datasets contain relativegapof69.2%onTaillard100×20instanceswith
+instanceswithsmallandlargescales,includingthosenot a much shorter computational time of 6.7 minutes in Ta-
+seenduringtraining,suchas100×20,whichchallenges ble. 2, compared to 1 hour taken by CP-SAT. Moreover,
+thegeneralizationabilityofourmodel.Itisworthnoting TBGATcanfindoptimalsolutionsforseveralbenchmark
+thatourmodelistrainedwithrandomlygeneratedsynthetic
+datasets, whereas the seven open benchmark datasets are †Please refer to http://optimizizer.com/TA.php and
+generated using distributions different from ours. Hence, http://jobshop.jjvh.nl/.
+
+--- PAGE 9 ---
+datasetswithdifferentscales,suchasFT 6×6,LA15×5, References
+LA20×5,andLA30×10,whileL2Sfailstodoso.These
+resultsconfirmthatTBGATachievesstate-of-the-artresults JosephAdams,EgonBalas,andDanielZawack. Theshift-
+onthesevenclassicbenchmarksandisrelativelyrobustto ingbottleneckprocedureforjobshopscheduling. Man-
+differentdatadistributions,astheinstancesinthesedatasets agementScience,34(3):391–401,1988.
+aregeneratedusingdistributionssubstantiallydifferentfrom
+DavidApplegateandWilliamCook. Acomputationalstudy
+ourtraining.
+ofthejob-shopschedulingproblem. ORSAJournalon
+Computing,3(2):149–156,1991.
+5.4 COMPARISONWITHOTHERSOTA
+EgonBalas. Machinesequencingviadisjunctivegraphs:an
+BASELINES
+implicitenumerationalgorithm. Operationsresearch,17
+(6):941–957,1969.
+Duetopagelimit,weleavethecomparisonagainstother
+SOTA baselines in Appendix G, including ACL Iklassov JacekBłaz˙ewicz,ErwinPesch,andMałgorzataSterna. The
+et al. [2022], JSSEnv Tassel et al. [2021], DGERD Chen disjunctivegraphmachinerepresentationofthejobshop
+etal.[2022]),andactivesearch(EASKwonetal.[2021]). schedulingproblem. EuropeanJournalofOperational
+Research,127(2):317–331,2000.
+GregBrockman,VickiCheung,LudwigPettersson,Jonas
+5.5 ABLATIONSTUDY
+Schneider, John Schulman, Jie Tang, and Wojciech
+Zaremba. Openaigym. arXivpreprintarXiv:1606.01540,
+Weconductedanablationstudyonthenumberofattention
+2016.
+heads.Wealsoempiricallyverifythelinearcomputational
+complexity.PleaserefertoAppendixHfordetails. Ruiqi Chen, Wenxin Li, and Hongbing Yang. A deep re-
+inforcement learning framework based on an attention
+6 CONCLUSIONANDFUTUREWORK
+mechanismanddisjunctivegraphembeddingforthejob
+shopschedulingproblem. IEEETransactionsonIndus-
+Wepresentanovelsolutiontothejobshopschedulingprob- trialInformatics,2022.
+lem(JSSP)usingthetopological-awarebidirectionalgraph
+GiacomoDaColandErichCTeppan. Industrialsizejob
+attentionneuralnetwork(TBGAT).Ourmethodlearnsrep-
+shop scheduling tackled by present day cp solvers. In
+resentationsofdisjunctivegraphsbyembeddingthemfrom
+InternationalConferenceonPrinciplesandPracticeof
+bothforwardandbackwardviewsandutilizingtopological
+ConstraintProgramming,pages144–160.Springer,2019.
+sortstoenhancetopologicalawareness.Wealsoproposean
+efficientmethodtocalculatethetopologicalsortsforboth
+AlicanDoganandDeryaBirant. Machinelearninganddata
+viewsandintegratetheTBGATmodelintoalocalsearch
+mininginmanufacturing. ExpertSystemswithApplica-
+framework for solving JSSP. Our experiments show that
+tions,166:114060,2021.
+TBGAToutperformsawiderangeofstate-of-the-artneural
+baselinesregardingsolutionqualityandcomputationalover- Matthias Fey and JanEric Lenssen. Fast graph represen-
+head.Additionally,wetheoreticallyandempiricallyshow tationlearningwithpytorchgeometric. arXivpreprint
+thatTBGATpossesseslineartimecomplexityconcerning arXiv:1903.02428,2019.
+the number of jobs and machines, which is essential for
+practicalsolvers. HenryFisher. Probabilisticlearningcombinationsoflocal
+job-shopschedulingrules. IndustrialScheduling,pages
+225–251,1963.
+MichaelRGarey,DavidSJohnson,andRaviSethi. The
+7 ACKNOWLEDGEMENT complexityofflowshopandjobshopscheduling. Mathe-
+maticsofoperationsresearch,1(2):117–129,1976.
+Wen Song is supported by the National Natural Sci-
+BruceLGolden,SubramanianRaghavan,EdwardAWasil,
+enceFoundationofChina(Grant62102228)andtheNat- etal. Thevehicleroutingproblem:latestadvancesand
+ural Science Foundation of Shandong Province (Grant newchallenges,volume43. Springer,2008.
+ZR2021QF063).ZhiguangCaoissupportedbytheNational
+Research Foundation, Singapore under its AI Singapore AndréHottung,Yeong-DaeKwon,andKevinTierney. Effi-
+Programme(AISGAwardNo:AISG3-RP-2022-031),and cientactivesearchforcombinatorialoptimizationprob-
+theSingaporeMinistryofEducation(MOE)AcademicRe- lems. InInternationalConferenceonLearningRepresen-
+searchFund(AcRF)Tier1grant. tations,2021.
+
+--- PAGE 10 ---
+Zangir Iklassov, Dmitrii Medvedev, Ruben Solozabal, AdamPaszke,SamGross,FranciscoMassa,AdamLerer,
+and Martin Takac. Learning to generalize dispatch- JamesBradbury,GregoryChanan,TrevorKilleen,Zem-
+ing rules on the job shop scheduling. arXiv preprint ingLin,NataliaGimelshein,LucaAntiga,etal. Pytorch:
+arXiv:2206.04423,2022. Animperativestyle,high-performancedeeplearningli-
+brary.Advancesinneuralinformationprocessingsystems,
+RoshniGIyer,WeiWang,andYizhouSun. Bi-levelatten- 32,2019.
+tiongraphneuralnetworks. In2021IEEEInternational
+ConferenceonDataMining(ICDM),pages1126–1131. LaurentPerronandVincentFurnon.Or-tools.URLhttps:
+IEEE,2021. //developers.google.com/optimization/.
+Alec Radford, Luke Metz, and Soumith Chintala. Un-
+AnantSinghJainandSheikMeeran.Deterministicjob-shop
+scheduling:Past,presentandfuture. Europeanjournalof supervised representation learning with deep convolu-
+operationalresearch,113(2):390–434,1999. tional generative adversarial networks. arXiv preprint
+arXiv:1511.06434,2015.
+Chaitanya K Joshi, Quentin Cappart, Louis-Martin
+Robert H Storer, S David Wu, and Renzo Vaccari. New
+Rousseau,andThomasLaurent. Learningthetravelling
+searchspacesforsequencingproblemswithapplication
+salespersonproblemrequiresrethinkinggeneralization.
+to job shop scheduling. Management Science, 38(10):
+Constraints,pages1–29,2022.
+1495–1509,1992.
+DieterJungnickelandDJungnickel. Graphs,networksand
+EricTaillard. Benchmarksforbasicschedulingproblems.
+algorithms,volume3. Springer,2005.
+EuropeanJournalofOperationalResearch,64(2):278–
+285,1993.
+Wouter Kool, Herke van Hoof, and Max Welling. Atten-
+tion, learn to solve routing problems! In International
+PierreTassel,MartinGebser,andKonstantinSchekotihin.A
+ConferenceonLearningRepresentations,2018.
+reinforcementlearningenvironmentforjob-shopschedul-
+ing. arXivpreprintarXiv:2104.03760,2021.
+Yeong-Dae Kwon, Jinho Choo, Iljoo Yoon, Minah
+Park, Duwon Park, and Youngjune Gwon. Matrix AshishVaswani,NoamShazeer,NikiParmar,JakobUszko-
+encoding networks for neural combinatorial optimiza- reit, Llion Jones, Aidan N Gomez, Łukasz Kaiser, and
+tion. In M. Ranzato, A. Beygelzimer, Y. Dauphin, IlliaPolosukhin. Attentionisallyouneed. Advancesin
+P.S. Liang, and J. Wortman Vaughan, editors, Ad- neuralinformationprocessingsystems,30,2017.
+vances in Neural Information Processing Systems,
+volume 34, pages 5138–5149. Curran Associates, Petar Velicˇkovic´, Guillem Cucurull, Arantxa Casanova,
+Inc., 2021. URL https://proceedings. AdrianaRomero,PietroLiò,andYoshuaBengio. Graph
+neurips.cc/paper/2021/file/ attentionnetworks.InInternationalConferenceonLearn-
+29539ed932d32f1c56324cded92c07c2-Paper. ingRepresentations,2018.
+pdf.
+Laung-TerngWang,Yao-WenChang,andKwang-TingTim
+Cheng. Electronicdesignautomation:synthesis,verifica-
+StephenLawrence. Resouceconstrainedprojectscheduling:
+tion,andtest. MorganKaufmann,2009.
+An experimental investigation of heuristic scheduling
+techniques(supplement). GraduateSchoolofIndustrial
+XiaoWang,HouyeJi,ChuanShi,BaiWang,YanfangYe,
+Administration,Carnegie-MellonUniversity,1984.
+PengCui,andPhilipSYu.Heterogeneousgraphattention
+network. InTheworldwidewebconference,pages2022–
+EugeniuszNowickiandCzeslawSmutnicki. Afasttaboo
+2032,2019.
+searchalgorithmforthejobshopproblem. Management
+science,42(6):797–813,1996.
+Ronald J Williams. Simple statistical gradient-following
+algorithmsforconnectionistreinforcementlearning. Ma-
+JunyoungPark,SanjarBakhtiyar,andJinkyooPark. Sched-
+chinelearning,8(3):229–256,1992.
+ulenet: Learn to solve multi-agent scheduling prob-
+lems with reinforcement learning. arXiv preprint LiangXin,WenSong,ZhiguangCao,andJieZhang. Multi-
+arXiv:2106.03051,2021a. decoder attention model with embedding glimpse for
+solvingvehicleroutingproblems. InProceedingsof35th
+Junyoung Park, Jaehyeong Chun, Sang Hun Kim,
+AAAIConferenceonArtificialIntelligence,pages12042–
+YoungkookKim,JinkyooPark,etal. Learningtosched-
+12049,2021.
+ulejob-shopproblems:representationandpolicylearning
+usinggraphneuralnetworkandreinforcementlearning. Keyulu Xu, Weihua Hu, Jure Leskovec, and Stefanie
+International Journal of Production Research, 59(11): Jegelka. Howpowerfularegraphneuralnetworks? In
+3360–3377,2021b. InternationalConferenceonLearningRepresentations,
+
+--- PAGE 11 ---
+2019. URLhttps://openreview.net/forum?
+id=ryGs6iA5Km.
+TakeshiYamadaandRyoheiNakano. Ageneticalgorithm
+applicable to large-scale job-shop problems. In PPSN,
+volume2,pages281–290,1992.
+Cong Zhang, Wen Song, Zhiguang Cao, Jie Zhang,
+Puay Siew Tan, and Xu Chi. Learning to dispatch for
+jobshopschedulingviadeepreinforcementlearning. In
+H.Larochelle,M.Ranzato,R.Hadsell,M.F.Balcan,and
+H.Lin,editors,AdvancesinNeuralInformationProcess-
+ingSystems,volume33,pages1621–1632.CurranAs-
+sociates,Inc.,2020. URLhttps://proceedings.
+neurips.cc/paper/2020/file/
+11958dfee29b6709f48a9ba0387a2431-Paper.
+pdf.
+CongZhang,ZhiguangCao,WenSong,YaoxinWu,and
+JieZhang. Deepreinforcementlearningguidedimprove-
+mentheuristicforjobshopscheduling. InTheTwelfth
+InternationalConferenceonLearningRepresentations,
+2024. URLhttps://openreview.net/forum?
+id=jsWCmrsHHs.
+
+--- PAGE 12 ---
+Learning Topological Representations with Bidirectional Graph Attention
+Network for Solving Job Shop Scheduling Problem
+CongZhang1 ZhiguangCao2 YaoxinWu3 WenSong†,4 JingSun1
+1NanyangTechnologicalUniversity,Singapore
+2SingaporeManagementUniversity,Singapore
+3DepartmentofIndustrialEngineering&InnovationSciences,EindhovenUniversityofTechnology
+4InstituteofMarineScienceandTechnology,ShandongUniversity,China
+1,4{cong.zhang92@gmail.com, wensong@email.sdu.edu.cn}
+A PROOFOFLEMMA1
+Proof.SinceO isaprerequisiteoperationofO ,thenthereexistsatleastonepathfromO toO intheforward
+ji mk ji mk
+viewofthedisjunctivegraph,i.e.,P ̸=∅,whereP denotesthesetofallpathsfromO toO .Then,
+(Oji,Omk) (Oji,Omk)
+→−
+ji m
+→−
+k
+foranypathP(O ,O ) ∈P ,bythetransitivityofthetopologicalsort,wecangetthat Φ(O ) < Φ(O ).
+ji mk (Oji,Omk) ji mk
+Furthermore,becauseP ̸= ∅,wehaveEST < EST duetotheprecedentconstraintsandtheprocessing
+(Oji,Omk) ji mk
+ordersgivenbythedisjunctivearcs,i.e.,theoperationsattheheadofthearcsalwaysstartearlierthanthatlocatedatthetail
+ofthearcs,whichalsotransitsfromO toO byfollowingthepathP(O ,O ). □
+ji mk ji mk
+B PROOFOFCOROLLARY1
+Proof.ItisasimilarprocedurebyfollowingtheproofofLemma1,butwitheachedgereversed.
+C PROOFOFTHEOREM1
+Proof. We show that mL x x = 1 for all nodes O x ∈ O. First, it is obvious that mL x¯ x¯ = 1,∀O x¯ ∈ O¯ since m0 x¯ = 1 and
+N = ∅.Second,onecanprovethatmLx˜ = 1bycontradiction.Specifically,ifmLx˜ ̸= 1,thentheremustexistanode
+x¯ x˜ x˜
+O ∈O¯connectingtoO viaapath,whichhasmessagem ̸=0,sinceL isthemaximumlength.Hence,itcontradicts
+x¯′ x˜ x¯′ x
+withm0 =1.Next,ifL <L foranypairofnodesO andO connectedbyapath,itisclearthatΦ(O )<Φ(O )by
+x¯′ x z x z x z
+thedefinitionofthetopologicalsort. □
+†Correspondingauthor.
+
+--- PAGE 13 ---
+D THEENTROPYREGULARIZEDREINFORCEALGORITHM
+Algorithm1n-stepREINFORCE
+Input:Policyπ (a |s ),steplimitT,stepsizen,learningrateα,trainingproblemsize|J|×|M|,batchsizeB,total
+θ t t
+numberoftraininginstancesI
+Output:Trainedpolicyπ (a |s )
+θ∗ t t
+1: fori=0toi<I do
+2: RandomlygenerateB instancesofsize|J|×|M|,andcomputetheirinitialsolutions{s1,...,sB}byusingthe
+0 0
+dispatchingruleFDD/MWKR
+3: InitializeatrainingdatabufferDbwithsize0foreachsb ∈{s1,...,sB};
+0 0 0
+4: fort=0toT do
+5: forsb ∈{s1,...,sB}do
+t t t
+6: Computealocalmoveab t ∼π θ (ab t |sb t )
+7: Updatesbw.r.tabandreceivearewardr(ab,sb)
+t t t t
+8: iftmodn=0then
+9: lossb =0
+θ
+10: forj =nto0do
+11: lossb θ +=−(logπ θ (ab t−j |sb t−j )·R t b −j +H(π θ (ab t−j |sb t−j ))),whereR t b −j isthereturnforstept−j and
+H(·)istheentropy;
+12: endfor
+13: θ =θ+α∇ θ (cid:0) lossb θ (cid:1) ;
+14: endif
+15: endfor
+16: endfor
+17: i=i+B
+18: endfor
+19: returnπ θ (a t |s t )
+E ALGORITHMCONFIGURATIONS
+Inourwork,wegeneraterandominstancesofJSSPastrainingdata,acrossvarioussizes:small(6×6,10×10,15×10),
+medium(15×15,20×10,20×15),tolarge(30×10,30×15)scales,involvinghundredsofoperations.Theoperation
+processingtimesareassignedrandomvaluesfrom1to99,andthesequenceofoperationsforeachjobisdeterminedthrough
+randompermutations.
+ThehyperparametersforourproposedTBGATmodelaredeterminedthroughempiricaltuningonthesmallproblemsize
+of10×10.ForFEMandBEM,weutilizethreelayerswitheachlayerconsistingoffourattentionheadsandahidden
+dimensionof128forboththeinputandhiddenlayers.Thenumberofattentionheadsservesasthemainparameterforour
+model.Therefore,weconductanablationstudytoinvestigatethecorrelationbetweenthenumberofattentionheadsand
+performance(seethestudyinsectionH.1).Regardingtheactionselectionnetwork,Net hasL =4hiddenlayers,each
+A A
+withhalfofthedimensionsofitsparentlayer.Toensurethestabilityofourtrainingprocess,wenormalizeallrawfeaturesby
+→− ←− →− →− ←− ←−
+dividingalargenumber.Specifically,wedivide Φ and Φ bythelargestsort Φ∗ =max Φ and Φ∗ =max Φ ,
+ji ji ji ji ji ji
+respectively.Theprocessingtimep isdividedby99,whileEST andLST arebothdividedby1000.Ourmodelis
+ji ji ji
+trainedforeachproblemsizeindependently,with128000randominstancesuniformlydistributedinto2000batchesofsize
+64,whicharegeneratedonthefly.
+Trainingphaseconfigurations. Duringtraining,weuseEC =1e−5,n=10,andT =500inourentropy-regularized
+REINFORCEalgorithmwithAdamoptimizerandconstantlearningratelr =1e−5.Throughoutourexperiments,actions
+aresampledfromthepolicy.ToensureafaircomparisonwithL2SZhangetal.[2024],theinitialsolutionsarecomputed
+usingthesameprioritydispatchingruleFDD/MWKR(minimumratioofflowduedatetomostworkremaining).Our
+TBGATnetworkisimplementedinthePytorch-Geometric(PyG)FeyandLenssen[2019]framework.Otherparameters
+followthedefaultsettingsinPyTorchPaszkeetal.[2019].Weconductallexperimentsonaworkstationequippedwithan
+
+--- PAGE 14 ---
+Table3:Performanceonsyntheticdatasets.“Gap”:theaveragegaptotheoptimalsolutionssolvedbyCP-SAT.“Time”:the
+averagetimeforsolvingasingleinstanceinseconds(“s”)orminutes(“m”).Fortheneuralmethods,thebestresultsare
+markedinbold,wheretheglobalbestresultsarecoloredblue.
+SyntheticDataset
+Method
+10×10 15×10 15×15 20×10 20×15
+Gap Time Gap Time Gap Time Gap Time Gap Time
+CP-SATPerronandFurnon 0.0% 0.3s 0.0% 8.2s 0.0%2.6m 0.0%3.9m 0.0%45.7m
+L2DZhangetal.[2020] 22.2% 0.224.3% 0.2s26.6% 0.4s20.4% 0.3s28.3% 0.6s
+L2S-500Zhangetal.[2024] 4.4% 7.3s 7.2% 7.9s 8.7% 9.6s 4.3% 8.8s10.9% 10.3s
+TBGAT-500 2.7% 9.5s 5.4%11.2s 6.7%12.4s 3.4%12.8s 9.3% 13.8s
+L2S-1000Zhangetal.[2024] 3.5%15.0s 5.7%16.0s 7.9%18.7s 3.4%17.3s 9.6% 21.3s
+L2S-2000Zhangetal.[2024] 2.8%30.3s 4.8%32.2s 6.8%37.8s 2.7%34.3s 8.4% 42.5s
+L2S-5000Zhangetal.[2024] 2.2%75.2s 4.0%80.9s 5.9%91.9s 2.3%85.1s 7.2% 1.6m
+TBGAT-1000 2.1%18.4s 4.3%22.0s 5.6%24.2s 2.4%24.9s 7.7% 26.8s
+TBGAT-2000 1.7%35.9s 3.7%44.4s 4.8%47.5s 2.0%49.1s 6.5% 52.8s
+TBGAT-5000 1.4%89.1s 3.0%1.8m 4.1%2.0m 1.4%2.0m 5.6% 2.2m
+AMDRyzenThreadripper3960X24-CoreProcessorandasingleNvidiaRTXA6000GPU.
+Evaluationphaseconfigurations. Duringtesting,weemploythesamehyperparametersasinthetrainingphaseandload
+themodelwiththeoptimaltrainedparameters.Furthermore,weevaluatethegeneralizationperformanceofourmodel
+onlargerimprovementsteps(upto5000)sincetheeffectivenessoftheimprovementheuristicsheavilyrelyonsufficient
+searchdepth.Specifically,wetrainourmodelwithT =500butevaluateitsperformanceon500,1000,2000,and5000
+improvementstepsforeachproblemsize,respectively.
+F RESULTSONSYNTHETICDATASET
+TheexperimentalresultsonthesyntheticdatasetsaresummarizedinTable3,wheretheupperandlowerdecksdisplay
+theresultsforbasictesting(500steps)andstep-wisegeneralization(1000,2000,and5000steps),respectively.Fromthe
+results,weobservethatL2SandTBGATwith500improvementstepsachievesuperiorperformancecomparedtoL2D,
+primarilybecauseimprovementheuristicsgenerallyoutperformconstructiononesintermsofsolutionquality.Furthermore,
+TBGAToutperformsL2Sregardingsolutionquality,withconsistentlybetterresultsacrossallstephorizons.Inparticular,
+TBGATwith1000stepsachievesasmalleroptimalitygapthanL2Swith2000stepsacrossallproblemsizes.Moreover,
+TBGAT-5000achievesthebestoverallresultsamongallthecomparedneuralmethods.ThesefindingssuggestthatTBGAT
+ismoreeffectiveinlearningrepresentationsfordisjunctivegraphs.
+G COMPAREWITHMORESOTABASELINES
+G.1 COMPARISONWITHEAS
+Inthissubsection,wepresentacomparisonbetweenTBGATandEASKwonetal.[2021],astate-of-the-artactivesearch
+methodforsolvingJSSP.Weevaluatetheperformanceofbothmethodsusinginstancesofthreedifferentscales,ensuringa
+faircomparisonwithEAS.WealsocomparethethreereportedversionsofEAS,namelyEAS-Emb,EAS-Lay,andEAS-Tab.
+TheresultsarepresentedinTable.4.ItisevidentthatTBGAToutperformsEASwithonly500improvementsteps,and
+TBGATalsohasasignificantadvantageincomputationaltime.ThisisbecauseEASisanactivesearchmethodthatrequires
+additionaltimeforfine-tuningoneachprobleminstance,whileTBGATcanquicklyinferhigh-qualitysolutionsoncetrained
+offline.
+G.2 COMPARISONWITHACL
+Inthissubsection,wecompareTBGATwithACLIklassovetal.[2022],acurriculumlearningmethodforlearningpriority
+dispatchingrulesthatcangeneralizetodifferentproblemsizes,specificallyontheTaillarddataset.Table.5presentsthe
+
+--- PAGE 15 ---
+Table4:PerformancecomparedwithEAS.“Gap”:theaveragegaptotheoptimalsolutionssolvedbyCP-SATwith3600
+secondstimelimit..“Time”:theaveragetimeforsolvingasingleinstanceinseconds(“s”)orminutes(“m”).Thebest
+resultsaremarkedinbold,wheretheglobalbestresultsarecoloredblue.
+SyntheticDataset
+Method
+10×10 15×15 20×15
+Gap Time Gap Time Gap Time
+EAS-EmbHottungetal.[2021]3.7%4.2m 11.7%13.2m16.8%22.2m
+EAS-LayHottungetal.[2021] 6.5%4.2m 13.8%15.0m17.6%27.6m
+EAS-TabHottungetal.[2021] 6.5%4.8m 15.9%17.4m20.7%30.6m
+TBGAT-500 2.7% 9.5s 6.7% 12.4s 9.3% 13.8s
+TBGAT-1000 2.1%18.4s 5.6% 24.2s 7.7% 26.8s
+TBGAT-2000 1.7%35.9s 4.8% 47.5s 6.5% 52.8s
+TBGAT-5000 1.4%81.9s 4.1% 2.0m 5.6% 2.2m
+Table5:PerformancecomparedwithACL.“Gap”:theaveragegaptothebestknownsolutionsreportedintheprevious
+literature.Thebestresultsaremarkedinbold,wheretheglobalbestresultsarecoloredblue.
+Taillard
+Method
+15×1520×1520×2030×1530×2050×1550×20100×20
+Gap Gap Gap Gap Gap Gap Gap Gap
+ACLIklassovetal.[2022] 15.0% 17.7% 17.4% 20.4% 21.9% 15.7% 16.0% 9.6%
+TBGAT-500 8.0% 9.9% 10.0% 13.3% 16.4% 9.6% 11.9% 6.4%
+TBGAT-1000 6.1% 8.7% 9.0% 10.9% 14.0% 7.5% 9.4% 4.9%
+TBGAT-2000 5.1% 7.3% 7.9% 9.4% 12.1% 5.6% 7.5% 3.0%
+TBGAT-5000 4.6% 6.3% 7.0% 6.8% 9.7% 2.6% 5.0% 1.2%
+comparisonresults,whichshowthatTBGAT-500outperformsACLby36.4%onaverageoptimalitygap.Theadvantage
+ofTBGAT-500overACLisfurtherexpandedwhenTBGAT-1000andTBGAT-2000areconsidered,demonstratingthe
+effectivenessandrobustnessofTBGATinsolvingJSSPinstancesofdifferentscales.
+G.3 COMPARISONWITHJSSENV
+Table6:DetailedmakespanvaluescomparedwiththeonlineDRLmethodJSSEnvonTaillard30×20dataset.Bestresults
+aremarkedasbold.“Time”:thetimeforsolvingasingleinstanceinseconds.
+Taillard30×20Instances
+Method
+Tai-41 Tai-42 Tai-43 Tai-44 Tai-45 Tai-46 Tai-47 Tai-48 Tai-49 Tai-50 Gap
+Cmax Time Cmax Time Cmax Time Cmax Time Cmax Time Cmax Time Cmax Time Cmax Time Cmax Time Cmax Time %
+JSSEnvTasseletal.[2021]2208 600.0s2168600.0s2086600.0s2261600.0s2227600.0s2349600.0s2101600.0s2267600.0s2154600.0s2216600.0s13.1
+TBGAT-5000 2255 173.7s2112171.2s2059170.9s2141173.7s2173172.7s2183168.7s2051 166.1 2136177.7s2130176.4s2132172.2s 9.7
+Inthissubsection,wefurthercompareourmethodwithJSSEnvTasseletal.[2021],anonlineneuralconstructionheuristic
+basedondeepreinforcementlearningonlyevaluatedonTaillard30×20instances.Asreportedinitsoriginalpaper,JSSEnv
+requires600secondsofsolvingtimeforeachprobleminstance.Incontrast,ourmethodfollowsanofflinetrainingand
+onlinetestingfashion,whichsavessignificanttimeduringevaluation.RegardingtheperformanceinTable.6,TBGAT
+almostoutperformsJSSEnvonallinstancesexceptfor‘Tai-41’.Importantly,JSSEnvlearnstosolveeachinstanceonline,
+whichmaybelessefficientingeneralizingtonewunseeninstancesthanourmethod,sinceTBGATcanbedirectlyapplied
+oncetrainedoffline.
+
+--- PAGE 16 ---
+G.4 COMPARISONWITHDGERD
+Table7:DetailedmakespanvaluescomparedwithDGERDonTaillardinstances.Bestresultsaremarkedasbold.
+TaillardInstances
+Method
+15×15 20×15 20×20 30×15 30×20 50×15 50×20 100×20
+Tai-01 Tai-02 Tai-11 Tai-12 Tai-21 Tai-22 Tai-31 Tai-32 Tai-41 Tai-42 Tai-51 Tai-52 Tai-61 Tai-62 Tai-71 Tai-72
+DGERDTransformerChenetal.[2022]1711.071639.301833.001765.072145.632015.892382.632458.522541.222762.263762.603511.203633.483712.306321.226232.22
+TBGAT-500 1333 1319 1532 1461 1805 1750 1995 2054 2384 2229 3139 3176 3190 3284 5885 5452
+TBGAT-1000 1333 1319 1532 1458 1805 1733 1949 2038 2315 2229 3052 3055 3094 3232 5814 5379
+TBGAT-2000 1333 1303 1532 1429 1805 1727 1903 2004 2281 2189 2969 2980 3042 3176 5748 5291
+TBGAT-5000 1314 1301 1476 1419 1776 1719 1842 1957 2255 2112 2869 2112 2978 3111 5631 5204
+Inthissubsection,wecontinuetocompareourmethodwithDGERDChenetal.[2022],anotherrecentneuralconstruction
+heuristicforsolvingJSSP.DGERDemploysaGNNtolearnthelatentrepresentationsforconstructingsolutionsfromthe
+partialsolutionrepresentedwithdisjunctivegraphs,whichissimilartoL2D.Intheoriginalexperiment,theyselectseveral
+representativeinstancesfromtheTaillardbenchmarksfortesting,whereeachinstanceissolved50timeswithDGERD,and
+theaveragemakespanisreported.WeevaluatetheperformanceofourmethodandDGERDonthesameinstances,andthe
+resultsarepresentedinTable7.Ingeneral,ourmethodwith500improvementstepsachievesamuchsmallermakespanthan
+DGERDoneachinstance.
+H ABLATIONSTUDIES
+970
+960
+950
+940
+930
+920
+910
+900
+890
+0 10 20 30 40 50
+Every 10 batches.
+xamC
+10×10 4-heads
+960 10×10 8-heads
+950
+940
+930
+920
+910
+900
+890
+0 20 40 60 80 100
+Every 10 batches.
+(a) Fordifferent#ofattentionheads
+xamC
+10×10 TBGAT
+10×10 L2S
+(b) LearningspeedcomparedwithL2SZhang
+etal.[2024].
+50
+45
+40
+35
+30
+25
+20
+15
+10 15 20 25 30 35 40
+Number of machines
+)sdnoces(
+emit
+nur
+egarevA
+17
+Ours-500
+16
+15
+14
+13
+12
+11
+10 15 20 25 30 35 40
+Number of jobs
+(c) Timecomplexityw.r.tM
+)sdnoces(
+emit
+nur
+egarevA
+Ours-500
+(d) Timecomplexityw.r.tJ
+Figure6:Ablationstudiesofthemodelarchitecture.
+
+--- PAGE 17 ---
+H.1 THENUMBEROFATTENTIONHEADS
+The expressiveness of attention-based graph neural networks is known to depend on the number of attention heads. In
+general,eachheadlearnsproblemrepresentationsindependently,andemphasizesadifferentrespectiveaspectoftheproblem
+thatcancompensateforeachother,thusresultinginamorecomprehensiveunderstandingoftheproblem.Therefore,it
+isimportanttoevaluatetheimpactofthenumberofheadsinourTBGATmodel.Tothisend,weconductedanablation
+study,trainingTBGATwithfourandeightattentionheadsonthe10×10problemsize,respectively.Fromthetraining
+curvesinFig.6(a),wecanobservethattheTBGATmodelwitheightheadslearnsfasterthantheonewithfourheads,but
+theperformanceafterconvergenceissimilar.However,theeight-headTBGATmodelappearstosufferfromoverfitting,as
+itsperformancestartstodegradeafter100batchesoftraining.
+H.2 SAMPLINGEFFICIENCYAGAINSTL2S
+TodemonstratethesuperiorityofTBGAToverL2SZhangetal.[2024]intermsofdataefficiencyduringtraining,we
+present the learning curves of the two models in Fig. 6(b). As can be observed, TBGAT learns much faster than L2S,
+whichcanbeattributedtoitsmoreappropriategraphembeddingmodulesandmoreeffectivetrainingalgorithm(i.e.,the
+entropy-regularizedREINFORCEalgorithm).ThisindicatesthatTBGATismoresampling-efficient,i.e.,requiresfewer
+instancestoreachagoodperformancelevel.
+H.3 VERIFICATIONOFLINEARCOMPUTATIONALCOMPLEXITY
+To verify Theorem 2, we examine the computational overhead of our method for solving instances of different scales.
+Fig.6(c)showsthecurvesofcomputationaltimeagainstthenumberofjobs|J|andmachines|M|,respectively.Wecan
+observethatourmethodexhibitsroughlylineartimecomplexitywithrespecttothenumberofjobsandmachines.This
+findingsupportsTheorem2,whichstatesthatthecomputationalcomplexityofourmethodscaleslinearlywiththeproblem
+size,makingitpracticalforsolvingJSSPinstancesoflargescales.

@@ -1,0 +1,918 @@
+
+--- PAGE 1 ---
+Job Shop Scheduling Benchmark: Environments
+and Instances for Learning and Non-learning
+Methods
+RobbertReijnena,IgorG.Smitb,HongxiangZhangc,YaoxinWua,ZaharahBukhsha,YingqianZhanga
+aDepartmentofIndustrialEngineering&InnovationSciences,EindhovenUniversityofTechnology,r.v.j.reijnen@tue.nl,y.wu2@tue.nl,
+z.bukhsh@tue.nl,yqzhang@tue.nl
+bDepartmentofMathematics&ComputerScience,EindhovenUniversityofTechnology,i.g.smit@tue.nl
+cSchoolofTransportationandLogistics,SouthwestJiaotongUniversity,hongxiang@my.swjtu.edu.cn
+Abstract. Jobshopschedulingproblemsaddresstheroutingandsequencingoftasksinajobshopsetting.Despitesignificantinterest
+fromoperationsresearchandmachinelearningcommunitiesovertheyears,acomprehensiveplatformfortestingandcomparing
+solutionmethodshasbeennotablylacking.Tofillthisgap,weintroduceaunifiedimplementationofjobshopschedulingproblems
+andtheirsolutionmethods,addressingthelong-standingneedforastandardizedbenchmarkingplatforminthisdomain.Ourplatform
+supportsclassicJobShop(JSP),FlowShop(FSP),FlexibleJobShop(FJSP),andAssemblyJobShop(AJSP),aswellasvariants
+featuring Sequence-Dependent Setup Times (SDST), variants with online arrivals of jobs, and combinations of these problems
+(e.g.,FJSP-SDSTandFAJSP).Theplatfromprovidesawiderangeofschedulingsolutionmethods,fromheuristics,metaheuristics,
+∗ and exact optimization to deep reinforcement learning. The implementation is available as an open-source GitHub repository ,
+servingasacollaborativehubforresearchers,practitioners,andthosenewtothefield.Beyondenablingdirectcomparisonswith
+existingmethodsonwidelystudiedbenchmarkproblems,thisresourceservesasarobuststartingpointforaddressingconstrained
+andcomplexproblemvariants.Byestablishingacomprehensiveandunifiedfoundation,thisplatformisdesignedtoconsolidate
+existingknowledgeandtoinspirethedevelopmentofnext-generationalgorithmsinjobshopschedulingresearch.
+Keywords: JobShopScheduling,MachineScheduling,Optimization,Benchmarking
+1. Introduction
+Jobshopschedulingproblems(JSPs)areafundamentalcategoryofschedulingchallengesthatare
+vitalforoptimizingoperationsinawiderangeofindustrialproductionenvironments(Zhangetal.
+2019,Wangetal.2021).Theseproblemsaredefinedbyacollectionofjobs,eachconsistingofone
+ormoreoperationsthatneedtobescheduledonasetofmachines.TheinherentNP-hardnatureof
+JSPsleadstosignificantcomplexity,whichisoftenfurtheramplifiedbyadditionalcontext-specific
+constraints from real-world industrial environments. Given the diverse nature of production tasks
+and the variability between manufacturing sectors, numerous JSP variants have been introduced
+to address distinct scheduling requirements (Xiong et al. 2022). Commonly observed variants and
+extensionsofJSPsincludetheFlowShopProblem(FSP),whereoperationsacrossjobsmustfollow
+1
+5202
+raM
+71
+]IA.sc[
+2v49721.8032:viXra
+
+--- PAGE 2 ---
+2
+afixedorderonaseriesofmachines;theFlexibleJobShopProblem(FJSP),whichallowsoperations
+to be processed on multiple machines, adding a layer of routing flexibility; and the Assembly Job
+Shop Problem (AJSP), which incorporates constraints that require operations from different jobs
+to be coordinated for effective assembly processes. Another commonly observed variant is the
+inclusion of Sequence-Dependent Setup Times (SDST), which increases complexity by requiring
+set-uptimesthatdependonthejobsequence,achallengeoftenencounteredinindustriesrequiring
+frequent machine adjustments for specific job sequences. Each of these variants introduces unique
+challengesthatfurtherincreasethecomplexityoffindingoptimalsolutions.
+ApproachesforaddressingJSPvariantscanbecategorizedintothreecategories:exactalgorithms,
+heuristic algorithms, and learning-based methods. Exact algorithms guarantee optimal solutions
+but are computationally expensive and do not scale well for large problem instances. In contract,
+heuristic algorithms offer greater efficiency scalability, including improvement heuristics, such
+as evolutionary algorithms (e.g., Zhang et al. (2011)), as well as construction heuristics (e.g.,
+Blackstone et al. (1982), Holthaus and Rajendran (1997)). However, heuristic methods often yield
+lower quality solutions and typically require extensive domain knowledge and significant tuning
+efforts. In recent years, learning-based approaches, particularly those that use deep reinforcement
+learning (DRL), have attracted considerable attention. DRL methods train neural networks to
+automaticallylearneffectiveheuristics,enablingefficientproblemsolvinginashortcomputational
+time(Smitetal.2024).
+Giventheincreasingcomplexityofindustrialschedulingproblems,whicharegatheringgrowing
+attention,andtherapiddevelopmentofnewsolutionmethods,thereisaclearneedformorerigor-
+ous evaluation frameworks. Currently, researchers and practitioners face significant challenges in
+comparing different (learning and non-learning) approaches for JSP problem variants that incor-
+porate practical constraints due to the scarcity of resources. The absence of a benchmark hinders
+thoroughevaluations,restrictstheuseofconsistentevaluationmetrics,andpreventsfairandrepro-
+ducible comparisons of algorithms under standardized conditions. To address these challenges,
+we introduce a comprehensive benchmarking repository that covers a wide range of JSP variants
+alongwiththeircorrespondingbenchmarkinstances.Thisrepositoryalsoprovidesadiversesetof
+solutionmethods,includingbothlearning-basedapproachesandtraditionaltechniques,allofwhich
+can be adapted to various scheduling scenarios. By providing a unified platform for evaluation,
+our resource enables researchers to benchmark new solution methods effectively while offering
+
+--- PAGE 3 ---
+3
+practitionersasolidfoundationforinitiatingprojectsonindustry-specificJSPvariantsoradvancing
+algorithmicdevelopments.
+The remainder of this paper is organized as follows. Section 2 provides an overview of the dif-
+ferentJSPvariants.Section3detailsthetechnicalimplementationofthebenchmark,describesthe
+included solution methods, and demonstrates how to use the repository. Section 4 presents a com-
+prehensiveempiricalevaluationthatanalyzestheperformanceofdifferentsolutionmethodsacross
+variousJSPvariantsusingpubliclyavailablebenchmarkinstances.Lastly,Section5concludesthe
+work.
+2. Job Shop Scheduling
+We have developed a scheduling environment capable of simulating the scheduling process for
+predefinedprobleminstancesanddynamiconlineenvironmentswherejobsarriveinrealtime.The
+current setup allows for scheduling across a variety of problem types, including JSP, FSP, FJSP,
+AJSP, variants with SDSTs, and variants where jobs arrive online according to specified distri-
+butions. In this section, we outline these problem variants using a disjunctive graph formulation:
+𝐺 =(𝑂,𝐶,𝐷),where𝑂={𝑂 𝑖𝑗 |∀𝑖, 𝑗}∪{𝑂 𝑆 ,𝑂 𝑇 }representsthesetofalloperations.Here,𝑂 𝑆 and
+𝑂 𝑇 aredummyoperationswithzeroprocessingtime,servingasthestartandendstates(Blaz˙ewicz
+et al. 2000). 𝐶 represents the set of directed arcs (i.e., conjunctions), which denote precedence
+constraints between operations within the same job, while 𝐷 includes undirected arcs (i.e., dis-
+junctions) linking operations that require the same machine for processing. Solving a scheduling
+probleminstanceinvolvesdeterminingthedirectionofeachdisjunctiontoensurethattheresultant
+graph forms a Directed Acyclic Graph (DAG). In the following, we outline each problem variant
+andprovideitsmathematicalformulation.
+2.1. ProblemDescriptions
+IntheJobShopSchedulingProblem(JSP), 𝑛 jobs 𝐽 ={𝐽 1 ,𝐽 2 ,...,𝐽 𝑛 } mustbescheduledacross 𝑚
+machines 𝑀 = {𝑀 1 ,𝑀 2 ,...,𝑀 𝑚 }. Each job 𝐽 𝑖 consists of a series of operations 𝑂 𝑖,𝑗, where 𝑂 𝑖,𝑗
+represents the 𝑗-th operation of the 𝑖-th job. Each operation 𝑂 𝑖,𝑗 must be processed on a specific
+machine 𝑀 𝑘 foragivenprocessingtime 𝑝 𝑖,𝑗,𝑘.Operationsmustbescheduledsuchthatnomachine
+processes more than one operation at a time and operations within each job follow their specified
+order. The disjunctive graph formulation for JSP is shown in Figure 1, which illustrates a 3-job,
+3-machine instance. Black arrows represent conjunctive arcs, denoting precedence within jobs,
+while dotted lines indicate disjunctive arcs, whose directions must be determined to create a valid
+
+--- PAGE 4 ---
+4
+schedule. Disjunctive arcs (or operation nodes) of the same color indicate operations that require
+thesamemachine.
+Figure1 DisjunctiveGraphRepresentationofaJobShopSchedulingProblem(JSP).LeftPanel:Thisillustratesa
+3(jobs)×3(machines)JSPinstance.Blackarrowsindicateconjunctivearcs,enforcingprecedencecon-
+straintsamongoperationswithinthesamejob.Dottedlinesrepresentdisjunctivearcs,whosedirections
+needtobedetermined.Disjunctivearcs(oroperationnodes)sharingthesamecolorcorrespondtooper-
+ationsrequiringthesamemachine.RightPanel:Representsafeasiblesolution(bestviewedincolor).
+FlowShopSchedulingProblem(FSP)differsfromJSPbyimposingastrictorderacrossmachines.
+In FSP, for any given job 𝐽 𝑖, operations must follow a fixed sequence across the machines: 𝑀
+1
+→
+𝑀 2 →...→𝑀 𝑚.Eachoperation𝑂 𝑖,𝑗 injob𝐽 𝑖 correspondstoprocessingonaspecificmachine 𝑀 𝑗
+and has a predetermined processing time 𝑝 𝑖,𝑗. This restriction contrasts with the flexibility seen in
+JSP,wheretheorderofoperationscanvary.ThedisjunctivegraphformulationforFSPisillustrated
+inFigure2,wherethesequentialnatureoftheproblemisreflectedinthestructureofthegraph.
+Figure2 Disjunctive Graph Representation of a Flow Shop Scheduling Problem (FSP). This illustrates a 3 (jobs)
+×3(machines)FSPinstance.Alljobsfollowthesamefixedmachineorder,withsame-coloredoperation
+nodesrepresentingoperationstobescheduledonthesamemachine.
+In both the JSP and FSP problem variants, each operation 𝑂 𝑖,𝑗 of a job 𝐽 𝑖 must be processed
+on a specific, predetermined machine 𝑀 𝑘 with a defined processing time. This differs in flexible
+
+--- PAGE 5 ---
+5
+problemvariants,suchastheFlexibleJobShopSchedulingProblem(FJSP),whereeachoperation
+𝑂 𝑖,𝑗 of a job 𝐽 𝑖 can be processed on one or more machines. This flexibility introduces an extra
+layerofdecision-making,requiringchoicesonhowtoallocateoperationstomachines,considering
+factors such as machine utilization and processing time to achieve the most efficient scheduling.
+ThedisjunctivegraphformulationforFJSPisshowninFigure3.
+Figure3 DisjunctiveGraphRepresentationofaFlexibleJobShopSchedulingProblem(FJSP).Thisillustratesa3
+(jobs)×3(machines)FJSPinstance.Operations,representedbygraynodes,canbeassignedtodifferent
+machines, allowing alternative routing options. Disjunctive arcs reflect both sequencing and machine
+assignmentdecisions,increasingschedulingcomplexity.
+In Assembly Job Shop Scheduling Problem (AJSP), a set of jobs is associated with different
+componentsthatmustbeproducedandassembledinaspecificsequencetoproduceafinalproduct.
+Eachjobcorrespondstotheassemblyofacomponent,andtheschedulingprocessischaracterizedby
+precedenceconstraintsthatdictatetheorderinwhichindividualcomponentsmustbemanufactured
+priortotheassemblyoperation.Thisensuresthatallnecessarycomponentsareavailableandready
+forassemblyattheappropriatetime.Thedisjunctivegraphformulationforthisschedulingvariant
+isillustratedinFigure4.
+IntheAssemblyJobShopSchedulingProblem(AJSP),asetofjobsinvolvestheproductionand
+assemblyofdifferentcomponentsinaspecificsequencetocreateafinalproduct.
+In the Assembly Job Shop Scheduling Problem (AJSP), a set of jobs is associated with various
+components that must be produced and assembled in a specific sequence to create a final product.
+Theproblemisdefinedbyprecedenceconstraintsthatdictatetheorderinwhichcomponentsmust
+beprocessedondifferentmachinesbeforetheycanbeassembledtogether.Theassemblyoperations
+depend on the completion of multiple preceding operations before its start. The disjunctive graph
+formulationforthisschedulingvariantisshowninFigure4.
+
+--- PAGE 6 ---
+6
+Figure4 DisjunctiveGraphRepresentationofanAssemblyJobShopSchedulingProblem(AJSP).Thisillustrates
+a 4 (jobs) × 3 (machines) AJSP instance. The first three jobs follow standard processing constraints,
+whilethefourthjobdependsontheircompletion,enforcinganadditionalassemblyprecedencestructure.
+Blackarrowsindicatetheconjunctivearcs,representingbothwithin-jobprecedenceconstraintsandfinal
+assemblydependencies.
+An additional layer of complexity is introduced when sequence-dependent setup times (SDSTs)
+are considered. In this variant, setup times between operations on the same machine depend on
+the sequence in which the operations are scheduled. This introduces a new challenge, as both the
+processing times and the setup times between operations must be taken into account to minimize
+total processing time and improve the overall efficiency of the schedule. The disjunctive graph
+formulation for a scheduling problem with SDST is shown in Figure 7b, which illustrates the
+interactionbetweenoperationsandtheirsequence-dependentsetuprequirements.
+Figure5 Disjunctive Graph Representation of a scheduling problem with Sequence-Dependent Setup Times
+(SDST). This illustrates a 3 (jobs) × 3 (machines) scheduling instance where disjunctive arcs not only
+determineoperationsequencingonsharedmachinesbutalsoencodesequence-dependentsetuptimes.
+Beyond traditional static scheduling problems, dynamic scheduling introduces an additional
+challenge by allowing jobs to arrive in real-time according to predefined probability distributions.
+
+--- PAGE 7 ---
+7
+UnlikestaticJSPanditsvariants,wherealljobdetailsareknownbeforehand,dynamicscheduling
+requires adaptive scheduling algorithms capable of responding to changes in real-time. In the
+disjunctive graph representation, this means that the graph structure itself evolves over time: new
+operation nodes and their corresponding conjunctive arcs are incrementally added as jobs arrive.
+This dynamic nature demands adaptive scheduling strategies capable of making online decisions,
+ensuringthatnewoperationsareseamlesslyaccountedforinthescheduling.
+Akeyfeatureofthisschedulingenvironmentisitsabilitytoextendandcombinemultipleproblem
+variants. Users can integrate additional constraints, modify objective functions, and construct
+hybrid scheduling scenarios that incorporate elements from different problem types. For example,
+it allows one to combine FJSP with SDSTs (FJSP-SDST) or introduce dynamic job arrivals into
+traditionally static problems. This flexibility makes the benchmark a powerful tool for researchers
+and practitioners to explore novel scheduling challenges, benchmark new solution methods, and
+developadvancedschedulingalgorithmsfordiverseproblemvariants.
+3. Job Shop Scheduling Environment
+TheproposedJobShopSchedulingBenchmarkisanopen-sourcePythonprojecthostedonGitHub.
+Itisdesignedtoprovideamodularandextensibleframeworkforsolvingandanalyzingscheduling
+problems and solution methods. The repository is structured into five main components: config-
+urations, data (problem instances), scheduling environment, solution methods, and visualization,
+as shown in Figure 6. These components maintain essential properties for configuring scheduling
+problemsandprovideaunifiedinterfacetointeractwithsolutionmethodstogenerateandevaluate
+schedulingsolutions.Wewilldiscussthesecomponentsinthefollowingsubsections.
+3.1. SchedulingEnvironment
+The core of the Job Shop Scheduling Benchmark is its scheduling environment, consisting of four
+essentialclassesthatformitsfoundation:Job,Operation,Machine,andJobShopEnv.TheJobclass
+captures the key attributes of individual jobs. Each job in the system is identified by a unique job
+identifierandconsistsofalistofassociatedoperationsthatneedtobescheduled.TheOperationclass
+containsdetailedinformationaboutspecificoperationswithinajob,includingitsuniqueOperation
+identifier,thecorrespondingJobidentifier,andprocessingtimesfordifferentmachinealternatives.
+TheMachineclassrepresentsmachineresourceswithintheschedulingenvironment.Eachmachine
+isassignedauniquemachineidentifierandkeepsalisttotracktheoperationsassignedtoit,along
+withtheirschedulingdetails(i.e.,starttimes,processtimes,andsetuptimes).TheJobShopEnvclass
+
+--- PAGE 8 ---
+8
+Figure6 GraphicalrepresentationoftheJobShopSchedulingBenchmarkrepository.Thebenchmarkconsistsof
+five main components: Configurations, Data, Scheduling Environment, Solution Methods, and Plotting.
+ThesecomponentsaredescribedinSection3,witheachplayingareroleinconfiguringschedulingprob-
+lems,interactingwithsolutionmethods,orvisualizingresults.
+serves as the central hub for managing all jobs, operations, and machine interactions. It integrates
+the configured Job, Operation, and Machine classes into a unified environment and facilitates
+the scheduling processes. This class provides functionalities for the tracking and scheduling of
+operations throughout the scheduling process. With this, the JobShopEnv acts as the interface
+throughwhichsolutionmethodscaninteractwiththeschedulingproblem,ensuringthatscheduling
+methods have access to a standardized setup for various configured jobs shop scheduling problem
+variants.
+3.2. StaticandDynamicScheduling
+The environment supports both static and dynamic scheduling scenarios through two key com-
+ponents: Data Parsers and a SimulationEnv. For static problem instances, we developed several
+parsers capable of handling various problem variants and data formats commonly found in the
+literature.TheseparsersextractinformationfrominstancefilesandconfiguretheJobShopEnvwith
+the corresponding Job, Operation, and Machine objects. This ensures that solution methods can
+operate within a standardized environment in which different variants of problems can be initial-
+ized from problem instances from the literature. We also offer a JSON-based data format with an
+accompanying parser, allowing practitioners to create custom problem instances without relying
+
+--- PAGE 9 ---
+9
+on the often cumbersome data formats commonly used in the literature (see Section 3.6). The
+SimulationEnv class provides a discrete event simulation environment tailored for real-time job
+arrivals.ItmanagesjobarrivaldetailswithintheJobShopandgeneratesthecorrespondingJoband
+Operation objects based on a specified distribution. This class is optional and is only required for
+onlineenvironmentswherejobsarrivedynamicallyaccordingtoapre-defineddistribution.
+3.3. ConfigurationandVisualization
+The interaction within the repository is configured through Configuration files. These files define
+all the required parameters for configuring the solution methods for testing and training (i.e., for
+learning-basedmethods),makingiteasytotestdifferentschedulingscenariosandsolutionmethods
+without needing to modify the underlying code. Problem instances and the scheduling solutions
+obtained can be inspected through Precedence Charts and Gantt charts. The precedence charts
+show the order in which operations must be performed within each job, while the Gantt charts
+displaythetimelineofoperationsscheduledacrossmachines,helpingusersevaluatethescheduling
+efficiencyoffoundsolutions.
+3.4. SolutionMethods
+The Job Shop Scheduling Benchmark environment provides a diverse range of solution methods
+tailoredtoaddresstheschedulingproblemsconfiguredwithintheenvironment.Thesemethodscan
+be broadly classified into three categories: exact algorithms, heuristic algorithms, and learning-
+based methods. Each solution method is implemented to seamlessly interact with the JobShopEnv
+introducedinSection3.1forsolvingaproblemvariant,andTable1summarizestheirapplicability
+tovariousproblemvariants.Theincludedsolutionmethodsaredescribedindetailbelow:
+Solutionsmethods JSP FSP FJSP SDST AJSP DynamicJSP
+Exact:CP-SAT ✓ ✓ ✓ ✓ ✓ ✗
+Exact:MILP ✓ ✓ ✓ ✓ ✓ ✗
+Heuristics:PriorityDispatchingRules ✓ ✓ ✓ ✓ ✓ ✓
+Heuristics:GeneticAlgorithm ✓ ✓ ✓ ✓ ✓ ✗
+DRL:L2D ✓ ✓ ✗ ✗ ✗
+DRL:FJSP-DRL ✓ ✓ ✓ ✗ ✗ ✓
+DRL:DANIEL ✓ ✓ ✓ ✗ ✗
+Table1 Availableimplementationofdifferentsolutionmethodsacrossdifferentschedulingproblemvariantsin
+thebenchmarkenvironment,asofFebruary6th,2025.Acheckmark(✓)indicatesthatthesolutionmethodis
+implementedandcapableofsolvingthegivenschedulingproblemvariant,whileacrossmark(✗)indicatesthatthe
+methodisnotcapableofsolvingit.Therepositorycontinuestobeupdatedwithnewsolutionmethodsandinstances.
+
+--- PAGE 10 ---
+10
+(a)
+(b)
+Figure7 (a) Precedence Chart of an instance with assembly constraints, where operations wait for more than
+onepredecessorfromdifferentjobstobecompleted.ColorsrepresentthejobID,andeachoperationis
+assignedauniqueoperationID.(b)GanttChartofasolutionforthesameinstance,illustratingthethe
+machineallocationandsequenceofscheduledoperations.
+Exact algorithms are designed to find optimal solutions by exhaustively exploring the solution
+space, ensuring the identification of optimal job sequences and machine assignments for job shop
+scheduling problems. These approaches, such as branch-and-bound, dynamic programming, and
+integer programming, are guaranteed to identify the best possible solutions, when provided with
+sufficient computing resources. However, as the size of the problem grows, these methods can
+
+--- PAGE 11 ---
+11
+become inefficient and face scalability challenges, making them most appropriate for small to
+medium-sized problems where computational capacity is sufficient. In the Job Shop Scheduling
+Benchmark, two primary exact approaches are implemented: Mixed Integer Linear Programming
+(MILP)andConstraintProgramming(CP).
+Mixed Integer Linear Programming (MILP) is a widely used method for solving constraint
+optimization problems (COPs) due to its flexibility in handling a wide range of constraints. By
+combiningcontinuousandintegerdecisionvariableswithinlinearobjectivesandconstraints,MILP
+offers a versatile and efficient approach to addressing a wide range of optimization challenges.
+The repository integrates the MILP models developed by Manne (1960), Roshanaei et al. (2013),
+and Shen et al. (2018) to address various scheduling problems with different constraints. These
+MILP models are defined to work with the Gurobi optimizer, which employs techniques such as
+branch-and-bound,cuttingplanes,andbranch-and-cuttoexplorethesolutionspace.
+Constraint Programming (CP) is another exact method used in the environment, particularly
+wellsuitedtohandlecomplexcombinatorialproblems.Inthecontextofjobshopscheduling,CPis
+effective at modeling intricate constraints such as precedence relations, machine-specific require-
+ments, and resource allocations. It uses techniques such as constraint propagation, backtracking,
+and domain reduction to explore possible solutions. CP solvers, such as IBM ILOG CPLEX and
+OR-Tools, are highly flexible and capable of addressing a wide range of constraints, making CP a
+powerful tool for solving diverse scheduling problems. In context of this benchmark, we specifi-
+cally use the CP-SAT solver from OR-Tools, which is known for its efficiency in solving complex
+schedulingproblems.Morespecifically,wehaveextendedtheCPformulationsprovidedinPerron
+etal.(2023)tofitthespecificsofthejobshopschedulingproblemvariantscentralinourproposed
+benchmarkingrepository.
+Heuristic algorithms are designed to find good enough solutions in a reasonable time frame,
+sacrificing optimality for efficiency. Such methods, which include dispatching rules, genetic algo-
+rithms, and various local search strategies, are generally more efficient and scalable than exact
+algorithms,makingthemmoresuitableforlarge-scaleproblems.However,thequalityofthesolu-
+tionstheyfindcanvaryandisheavilydependentonthedomainknowledgeusedtodesignandtune
+theheuristics.
+PriorityDispatchingRules(PDRs)areaclassofheuristicalgorithmsthatdeterminetheorderof
+jobprocessingbyprioritizingthemaccordingtospecificcriteria,suchasjobarrivaltimes,operation
+durationsorresourcerequirements.IntheJobShopSchedulingBenchmark,weimplementseveral
+
+--- PAGE 12 ---
+12
+commonly used PDRs, including First In, First Out (FIFO), Least Operations Remaining (LOR),
+Least Work Remaining (LWR), Most Operations Remaining (MOR), and Most Work Remaining
+(MWR). FIFO, being one of the simplest and most intuitive, processes jobs in the order of their
+arrival. LOR and LWR prioritize jobs that have the least remaining processing, facilitating their
+earlycompletion.Incontrast,MORandMWRfocusonbalancingtheoverallcompletiontimesby
+prioritizing jobs with the most remaining operations and work, respectively. In addition to these
+PDRs, machine allocation rules are used in Flexible problem variants (e.g., FJSP), for allocating
+operationstomachines.TwocommonlyusedrulesareEarliestExpectedTime(EET)andShortest
+Processing Time (SPT). EET assigns jobs to the machine that is expected to become available
+soonest, reducing machine idle time and enhancing overall throughput. SPT prioritizes jobs with
+theshortestprocessingtime.
+Genetic Algorithms (GAs) are search-based heuristics inspired by the principles of natural
+selection. They iteratively evolve solutions by simulating biological processes, such as selection,
+crossover, and mutation, to identify optimal or near-optimal solutions. Although GAs are gener-
+ally slower than PDRs due to their computationally intensive search process, their evolutionary
+approach is highly effective at uncovering innovative and diverse solutions that simpler methods
+might overlook. In the Job Shop Scheduling Benchmark, we specifically implement a GA con-
+figured with two main components: a Machine Selection component and an Operation Sequence
+component, based on Zhang et al. (2011). The Machine Selection component is an integer array
+that assigns operations to specific machines. Each operation has a fixed position, and the value
+at that position corresponds to the selected machine for the operation. The Operation Sequence
+component dictates the scheduling order of operations on assigned machines, allowing each job
+indextoappearasmanytimesasitsnumberofoperations.Thisencodingenablestheconstruction
+of schedules by assigning operations to the earliest feasible times on their allocated machines.
+The GA population is initialized with three methods: Global Selection (minimizing total machine
+processing time across all jobs), Local Selection (minimizing machine time for individual jobs),
+and Random Selection. The Operation Sequence is initialized randomly. The Machine Selection
+component undergoes two-point or uniform crossover, while the Operation Sequence component
+usesprecedence-preservingorder-basedcrossover(POX),whichmaintainstheschedulingorderof
+a subset of jobs. This approach effectively balances solution diversity and optimization by initial-
+izing60%ofthepopulationwithGlobalSelection,30%withLocalSelection,and10%randomly,
+enhancingitsabilitytofindnear-optimalschedules.
+
+--- PAGE 13 ---
+13
+Learning-basedmethodshavegainedsignificantattentioninsolvingjobshopschedulingprob-
+lems.Amongthesemethods,DRLandgraphneuralnetworks(GNNs)haveproventobeparticularly
+effective. These approaches are well-suited for handling scheduling problems because they can
+automatically learn effective heuristics and policies by interacting with the problem environment.
+Since scheduling problems can naturally be represented as graphs, where jobs and machines cor-
+respondtonodesandedges,GNNsareidealforcapturingtherelationshipsamongjobs,machines,
+and their constraints. GNNs are capable of learning the structure of the scheduling problem and
+generating efficient heuristics that can tackle various problem configurations (Xie et al. 2019,
+Xiong et al. 2022, Smit et al. 2024). In the context of this benchmark, we have included several
+representativeDRL-basedmethodsasfollows.
+Learning-to-Dispatch (L2D), proposed by Zhang et al. (2020), introduced the first end-to-end
+DRL approach to address JSP. L2D learns PDRs using a disjunctive graph representation, with
+a graph isomorphism network (GIN) trained via proximal policy optimization (PPO) to generate
+embeddings for the graph, which are then used to make scheduling decisions. L2D consistently
+outperformedtraditionalPDRsintermsofsolutionqualitywhilemaintaininghighspeed.Although
+L2D does not achieve the performance of exact solution methods, such as the OR-Tools CP-SAT
+solver,itprovidessignificantlyfasterprocessingtimesonlargerinstances.
+FJSP-DRL, introduced by Song et al. (2022), extends L2D to learn PDRs to solve FJSP. This
+method extends the disjunctive graph by introducing machine nodes, creating a heterogeneous
+graph structure that effectively captures the relationships among operations, machines, and their
+connections. This reduces graph density and allows the trained DRL agent to consider the full
+scopeofschedulingconstraintsbycombiningoperationselectionandmachineassignmentdecision
+makingintoasingledecision.Aheterogeneousgraphneuralnetwork(HGNN)isusedtogenerate
+feature embeddings for both operations and machines, which are input to a policy network trained
+via the PPO algorithm. Experiments demonstrate that this approach outperforms traditional PDRs
+byachievinghigherschedulingqualityandmaintainingcomputationalefficiencyonlargerproblem
+instances.BesidesitsapplicationtoFJSP,theapproachcanstillbeappliedtolesscomplexvariants,
+such as Job Shop Scheduling and Flow Show Scheduling without the machine selection problem
+characteristic.
+DANIEL, proposed by Wang et al. (2023) makes use of self-attention models and DRL to solve
+FJSP.Theframeworkintroducesadualattentionnetwork(DAN)tomapthepriorityofoperations
+and the relationship of machine selection through separate attention mechanisms. This allows for
+
+--- PAGE 14 ---
+14
+theprocessingoflargeandcomplexscheduleswhilereducingirrelevantdata,makingitapowerful
+approach for larger-scale scheduling problems. Trained using PPO, the framework demonstrates
+strongperformance,outperformingtraditionalPDRsandotherDRL-basedmethods.
+3.5. Exampleusage
+Building on the solution methods discussed in the previous section, we present 3 example usages
+ofdifferentsolutionmethodstointeractwiththeenvironmenttoobtainsolutions.Thefirstexample
+in Listing 1 shows how to use the PDR methods. The different parameters for configuring the
+problem instance to be solved and the configuration of the solution method (its dispatching rules)
+areprovidedthroughaconfigurationfile.ThesecondexampleinListing2showshowaGAcanbe
+used to solve a problem configured in the environment, and the third example in Listing 3 shows
+how a DRL-based method, L2D, can be used. These examples provide a helpful understanding
+of how the different solution methods interact with the environment. We provide more extensive
+implementationexamplesforeachofthedifferentsolutionmethodsalongsidetheirimplementation
+codeintherepository12
+Listing1:DispatchingRulesexample
+1 from solution_methods.dispatching_rules import run_dispatching_rules
+2 from solution_methods.helper_functions import load_job_shop_env, load_parameters
+3
+4 parameters = load_parameters("configs/dispatching_rules.toml")
+5 jobShopEnv = load_job_shop_env(parameters[’instance’].get(’problem_instance’))
+6
+7 makespan, jobShopEnv = run_dispatching_rules(jobShopEnv, **parameters)
+Listing2:GeneticAlgorithmexample
+1 from solution_methods.GA.src.initialization import initialize_run
+2 from solution_methods.helper_functions import load_job_shop_env, load_parameters
+3 from solution_methods.GA.run_GA import run_GA
+4
+5 parameters = load_parameters("configs/genetic_algorithm.toml")
+6 jobShopEnv = load_job_shop_env(parameters[’instance’].get(’problem_instance’))
+7
+8 population, toolbox, stats, hof = initialize_run(jobShopEnv, **parameters)
+9 makespan, jobShopEnv = run_GA(jobShopEnv, population, toolbox, stats, hof, **parameters)
+1https://github.com/ai-for-decision-making-tue/Job_Shop_Scheduling_Benchmark_Environments_and_
+Instances/blob/main/tutorial_benchmark_environment.ipynb
+2https://github.com/ai-for-decision-making-tue/Job_Shop_Scheduling_Benchmark_Environments_and_
+Instances/blob/main/tutorial_custom_problem_instance.ipynb
+
+--- PAGE 15 ---
+15
+Listing3:L2Dexample
+1 from solution_methods.L2D.src.run_L2D import run_L2D
+2 from solution_methods.helper_functions import load_job_shop_env, load_parameters
+3
+4 parameters = load_parameters("configs/L2D.toml")
+5 jobShopEnv = load_job_shop_env(parameters[’instance’].get(’problem_instance’))
+6 makespan, jobShopEnv = run_L2D(jobShopEnv, **parameters)
+3.6. Customproblemconfiguration
+In addition to supporting standard problem instances from the literature, the Job Shop Scheduling
+Environment allows users to define custom scheduling problems using a flexible JSON-based
+format. This format enables users to specify the elements of their problem configuration, such
+as scheduling type (job shop or flow shop), machine assignments, job dependencies, operation-
+specific processing times, and sequence-dependent setup times. Through this, users can tailor
+problemconfigurationstosuitspecificoperationalneedsorresearchscenariosandpassaconfigured
+environmenttoasolutionmethod.AnexampleofthisJSONconfigurationisprovidedinListing4.
+Listing4:Customproblemexample
+1 processing_info = {
+2 "instance_name": "custom_problem_instance",
+3 "nr_machines": 2,
+4 "jobs": [
+5 {"job_id": 0, "operations": [
+6 {"operation_id": 0, "processing_times": {"machine_1": 10, "machine_2": 20},
+7 "predecessors": None},
+8 {"operation_id": 1, "processing_times": {"machine_1": 25, "machine_2": 19},
+9 "predecessors": [0]}
+10 ]},
+11 {"job_id": 1, "operations": [
+12 {"operation_id": 2, "processing_times": {"machine_1": 23, "machine_2": 21},
+13 "predecessors": None},
+14 {"operation_id": 3, "processing_times": {"machine_1": 12, "machine_2": 24},
+15 "predecessors": [2]}
+16 ]},
+17 {"job_id": 2, "operations": [
+18 {"operation_id": 4, "processing_times": {"machine_1": 37, "machine_2": 21},
+19 "predecessors": None},
+20 {"operation_id": 5, "processing_times": {"machine_1": 23, "machine_2": 34},
+21 "predecessors": [4]}
+22 ]}
+23 ],
+24 "sequence_dependent_setup_times": {
+25 "machine_1": [
+26 [0, 25, 30, 35, 40, 45],
+27 [25, 0, 20, 30, 40, 50],
+28 [30, 20, 0, 10, 15, 25],
+29 [35, 30, 10, 0, 5, 10],
+30 [40, 40, 15, 5, 0, 20],
+31 [45, 50, 25, 10, 20, 0]
+
+--- PAGE 16 ---
+16
+32 ],
+33 "machine_2": [
+34 [0, 21, 30, 35, 40, 45],
+35 [21, 0, 10, 25, 30, 40],
+36 [30, 10, 0, 5, 15, 25],
+37 [35, 25, 5, 0, 10, 20],
+38 [40, 30, 15, 10, 0, 25],
+39 [45, 40, 25, 20, 25, 0]
+40 ]
+41 }
+42 }
+Consequently, in Listing 5, we show how the GA can be applied to solve the custom-configured
+problem. The listing illustrates how the problem setup is integrated into the algorithm, which then
+iterativelyrefinestheschedulingsolutionsthroughcrossover,mutation,andselection.
+Listing5:ExampleforsolvingthecustomconfiguredproblemwithaGeneticAlgorithm
+1 from solution_methods.GA.src.initialization import initialize_run
+2 from solution_methods.GA.run_GA import run_GA
+3 from data.data_parsers.custom_instance_parser import parse
+4
+5 parameters = load_parameters("configs/genetic_algorithm.toml")
+6 jobShopEnv = parse(processing_info)
+7 population, toolbox, stats, hof = initialize_run(jobShopEnv, **parameters)
+8 makespan, jobShopEnv = run_GA(jobShopEnv, population, toolbox, stats, hof, **parameters)
+4. Experimentation
+We present a comprehensive empirical evaluation that analyzes the performance of different solu-
+tion methods across various variants of Job Shop Scheduling problems, using publicly available
+benchmark instances for an in-depth comparison. In this section, we first introduce the available
+benchmarks, followed by the experimental setup, and then provide the performance results from
+ourexperimentsonaselectedsetofpubliclyavailableprobleminstances.
+4.1. ProblemInstances
+Over the years, various works have introduced problem instances for different variants of schedul-
+ing problems. Many of these have become widely accepted benchmarks in subsequent research.
+These standardized datasets facilitate fair comparisons between algorithms, offering a consistent
+frameworkforevaluatingperformanceacrossawidearrayofproblemconfigurations.Inthecontext
+ofthisproject,wehavecollectedvariousdatasetsandprovidedtheminourrepository.Weprovide
+an overview in Table 2 of the included datasets. The table provides an overview of five major
+scheduling problem categories that can be modeled and solved using the environment: JSP, FSP,
+
+--- PAGE 17 ---
+17
+FJSP, FJSP with SDSTs (FJSP-SDST), and a Flexible AJSP (FAJSP). For each category, the table
+details the original studies or datasets from which these benchmarks were derived, the problem
+scale(e.g.,numberofjobsandmachines),andthenumberofinstances.
+Table2 Publicbenchmarkinginstancesforschedulingproblems.
+SchedulingProblems ProblemBenchmarksandDetails
+JobShopScheduling(JSP) • Adamsetal.(1988):10-20jobs,5-10machines,6instances.
+• Demirkoletal.(1998):Medium-scale,20instances.
+• Taillard(1993):Upto100jobsand20machines,80instances.
+FlowShopScheduling(FSP) • Valladaetal.(2015):10-800jobs,5-60machines,2x240instances.
+Flexible Job Shop Scheduling • Brandimarte(1993):10-20jobs,4-15machines,10instances.
+(FJSP) • Hurinketal.(1994):7-30jobs,4-15machines,4x66instances.
+• Dauze`re-Pe´re`sandPaulli(1994):10-20jobs,5-10machines,18instances.
+• BarnesandChambers(1996):10-15jobs,11-18machines,21instances.
+• Kacemetal.(2002):Highflexibility,8instances.
+• Fattahietal.(2007):2-12jobs,2-8machines,20instances.
+FJSP with Sequence Dependent • Fattahietal.(2007)(extendedbyHexaly):2-12jobs,2-8machines,20instances.
+SetupTimes(FJSP-SDST)
+Flexible Assembly Job Shop • Birginetal.(2014):10-50jobs,5-10machines,50instances.
+Scheduling(FAJSP)
+4.2. ExperimentalSetup
+WeconductedexperimentsonJSP,FSP,andFJSPwiththebenchmarkinginstancesprovidedabove
+to demonstrate the performance of different algorithms within the benchmarking environment.
+For each type of problem, we selected specific subsets of instances. For JSP, we used the first 80
+instances from Taillard (1993). For FSP, the experiments were based on instances from Vallada
+et al. (2015), with 10, 30, and 50 jobs. For FJSP, we used instances from Brandimarte (1993) as
+wellasinstancese,r,andvdatafromHurinketal.(1994).
+The experiments were executed on a system equipped with an Intel Core i7 processor, 32GB
+of RAM. For exact methods, we used CP-SAT with the OR-Tools solver (v9.9) and MILP with
+Gurobi (v11.0.1). Both solvers were configured with a maximum search time of 3600 seconds for
+each instance. For heuristic methods, we applied the SPT, MWR, and MOR dispatching rules. In
+case of the FJSP problem variant, an earliest-available heuristic was used for machine selection,
+ensuringthatjobswereassignedtothemachinethatwouldbeavailabletheearliest.Theseheuristic
+methodsarecomputationallylightweightanddonotrequireadditionalparameterstobeset.AGA
+wasconfiguredwithapopulationsizeof100andasearchbudgetof100generations.Thealgorithm
+
+--- PAGE 18 ---
+18
+was configured with a crossover rate of 0.7, and the mutation rate was set at 0.02, following
+commonlyusedvaluesforGA.Forlearning-basedmethods,weusedL2D,FJSP-DRL,andDANIEL
+DRL-based methods. All three methods were trained on the same set of problem instances: 5x5,
+10x10,and20x20,representingthenumberofjobsandmachines,respectively.ForFJSP-DRLand
+DANIEL, both trained on the FJSP problem, we followed the instance generation configuration
+of Song et al. (2022). The training hyperparameters were set according to those specified in their
+original publications. For learning-based solutions, we used greedy action selection to choose the
+mostvaluedactionsandanactionsamplingstrategytogenerate100distinctsolutionsperinstance
+bysamplingfromtheactionvalues.
+4.3. Resultsonpublicinstances
+We compare the obtained results with the best-known solutions (BKSs) from the literature and
+show the aggregated results in Table 3. We provide a full overview of the best-known solutions in
+AppendixAandmoredetailedresultstablesinAppendixB.
+Table3 AggregatedPerformanceresultsforJSP,FSPandFJSPinstances.
+JSP FSP FJSP
+Meanmakespan Meangap Meanmakespan Meangap Meanmakespan Meangap
+CP-SAT 2380,56 0,75 2448,15 2,72 1433,67 0,09
+MILP - - - - 1453,90 1,65
+SPT 2951,98 27,51 2749,92 16,48 1754,51 23,88
+MWR 2772,06 19,53 2968,63 24,78 1656,40 14,83
+MOR 2778,00 19,69 2954,90 24,54 1656,42 14,83
+GA-100x100 3101,26 34,50 2740,13 14,32 1765,70 23,70
+L2D-greedy 2930,24 26,58 2998,55 26,37 - -
+L2D-sample 3072,71 30,92 3580,13 44,81 - -
+FJSP-DRL-greedy 2898,20 23,93 2947,27 24,03 1721,10 20,41
+FJSP-DRL-sample 2767,16 18,47 2748,82 15,33 1555,40 8,61
+DANIEL-greedy 2740,28 18,24 2846,55 20,73 1658,03 14,94
+DANIEL-sample 2661,26 14,42 2750,73 16,71 1572,74 9,11
+BKS 2366,65 0,00 2360,95 0,00 1432,80 0,00
+The CP-SAT solver stands out as the most effective method overall, consistently achieving the
+smallest mean gaps across all three types of problems. For JSP, it achieved a mean gap of only
+0.75%, closely approximating the Best-Known Solutions (BKS). For FSP, configured with larger
+problem instances, its achieves a mean gap of 2.72%, and for FJSP, the solver achieves a mean
+gap of 0.09%. These results highlight the solver’s reliability and effectiveness in finding near-
+optimalsolutionsacrossdiverseschedulingproblemsandsizes.However,itisimportanttonotethat
+this performance superiority comes with a significant computational cost, requiring much longer
+runtimes compared to heuristics and learning-based approaches. In contrast, the MILP method,
+
+--- PAGE 19 ---
+19
+being configured with the same runtime budget as CP-SAT, performed substantially worse. It was
+unable to produce solutions for many JSP and FSP problem instances within the configured time
+limits.
+The priority dispatching rules, such as SPT, MWR, and MOR provided quick solution to the
+included problem instances, but demonstrate significant performance gaps compared to CP-SAT
+and learning-based methods. For JSP, these heuristics achieved mean gaps ranging from 19.53%
+(MWR) to 27.51% (SPT), compared to BKS. In FSP, the gaps were slightly smaller, with SPT
+performingthebestamongtheheuristicsat16.48%,andinFJSP,MWRandMORperformedbetter,
+bothachievingameangapof14.83%,whileSPTfellbehindwithagapof23.88%.Thishighlights
+the variability of heuristics depending on the type of problem. The GA exhibited inconsistent
+performance between problem types. In JSP, it performed poorly, achieving the largest mean gap
+of 34.50%. However, in FSP, GA performance improved, with a mean gap of 14.32%, making
+it competitive with learning-based methods. Overall, GA performance suggests that it requires a
+higher search budget (i.e., larger population size and/or more generations of search). In addition,
+it could also benefit from tuning its operator parameters (e.g., the work of Zhang et al. (2011)
+noticesthewiderangeofoptimalparametersfordifferentdistributedprobleminstancesofdifferent
+sizes)orfrombeingconfiguredwithbetterinitialsolutions(e.g.,thoseobtainedusingthePRDsor
+obtainedwiththelearning-basedmethods).
+The learning-based methods, L2D, FJSP-DRL, and DANIEL, demonstrated competitive per-
+formance, often surpassing traditional heuristics. Among these, FJSP-DRL (sampling-based) was
+particularly strong, achieving the smallest mean gap for FJSP with an 8.61%, excluding the exact
+methods, and also performed competitively for JSP and FSP. Also, the sampling configuration of
+DANIELperformedstrongly,achievingameangapof14.42%forJSP,outperformingallheuristics
+andlearning-basedmethods,andsecondbestinFSPandFJSP(excludingtheexactmethods).The
+performanceoftheL2Dmethodlagsbehindthatoftheotherlearning-basedmethods.
+5. Conclusion
+Thisbenchmarkrepositoryisanongoingandjointefforttoaddressmachineschedulingproblems.
+New scheduling solutions using a hybrid approach, i.e., integrated learning and heuristics, are
+also in development and will be included upon completion. This repository also has welcomed
+contributions from researchers outside of the core development team, and will continue to be
+updated over time to provide a comprehensive profile of state-of-the-art performance in solving a
+widerangeofmachineschedulingproblems.
+
+--- PAGE 20 ---
+20
+AppendixA: Bestknownsolutions
+For the problem instances examined in the experiments above, the best known solutions were collected from three
+sources3
+Table4 Best-Knownsolutions(BKS)forTaillard(1993)JobShopSchedulinginstances1-80.Valuesinbold
+indicateoptimalsolutions.
+Tailard1-20 Tailard21-40 Tailard41-60 Tailard61-80
+Instance BKS Instance BKS Instance BKS Instance BKS
+ta01 1231 ta21 1642 ta41 2006 ta61 2868
+ta02 1244 ta22 1600 ta42 1939 ta62 2869
+ta03 1218 ta23 1557 ta43 1846 ta63 2755
+ta04 1175 ta24 1644 ta44 1979 ta64 2702
+ta05 1224 ta25 1595 ta45 2000 ta65 2725
+ta06 1238 ta26 1643 ta46 2006 ta66 2845
+ta07 1227 ta27 1680 ta47 1889 ta67 2825
+ta08 1217 ta28 1603 ta48 1937 ta68 2784
+ta09 1274 ta29 1625 ta49 1960 ta69 3071
+ta10 1241 ta30 1584 ta50 1923 ta70 2995
+ta11 1357 ta31 1764 ta51 2760 ta71 5464
+ta12 1367 ta32 1784 ta52 2756 ta72 5181
+ta13 1343 ta33 1791 ta53 2717 ta73 5568
+ta14 1345 ta34 1828 ta54 2839 ta74 5339
+ta15 1339 ta35 2007 ta55 2679 ta75 5392
+ta16 1360 ta36 1819 ta56 2781 ta76 5342
+ta17 1462 ta37 1771 ta57 2943 ta77 5436
+ta18 1396 ta38 1673 ta58 2885 ta78 5394
+ta19 1332 ta39 1795 ta59 2655 ta79 5358
+ta20 1348 ta40 1670 ta60 2723 ta80 5183
+Table5 Best-Knownsolutions(BKS)forValladaetal.(2015)FlowShopSchedulinginstanceswith10,30,and50
+jobs,respectively.Valuesinboldindicateoptimalsolutions.
+VFR10 VFR20 VFR50
+instance BKS instance BKS instance BKS
+VFR10 10 1 1051 VFR30 10 1 1944 VFR50 10 1 2926
+VFR10 10 2 1037 VFR30 10 2 2098 VFR50 10 2 3035
+VFR10 10 3 1071 VFR30 10 3 2077 VFR50 10 3 3019
+VFR10 10 4 984 VFR30 10 4 1945 VFR50 10 4 3003
+VFR10 10 5 1060 VFR30 10 5 2023 VFR50 10 5 3253
+VFR10 10 6 1011 VFR30 10 6 2043 VFR50 10 6 3149
+VFR10 10 7 1026 VFR30 10 7 1967 VFR50 10 7 2842
+VFR10 10 8 1061 VFR30 10 8 1896 VFR50 10 8 3072
+VFR10 10 9 1020 VFR30 10 9 1908 VFR50 10 9 3022
+VFR10 10 10 1026 VFR30 10 10 1915 VFR50 10 10 3056
+VFR10 20 1 1568 VFR30 20 1 2643 VFR50 20 1 3693
+VFR10 20 2 1686 VFR30 20 2 2835 VFR50 20 2 3719
+VFR10 20 3 1640 VFR30 20 3 2783 VFR50 20 3 3784
+VFR10 20 4 1567 VFR30 20 4 2680 VFR50 20 4 3709
+VFR10 20 5 1570 VFR30 20 5 2672 VFR50 20 5 3632
+VFR10 20 6 1755 VFR30 20 6 2715 VFR50 20 6 3795
+VFR10 20 7 1633 VFR30 20 7 2712 VFR50 20 7 3696
+VFR10 20 8 1575 VFR30 20 8 2812 VFR50 20 8 3783
+VFR10 20 9 1666 VFR30 20 9 2795 VFR50 20 9 3816
+VFR10 20 10 1609 VFR30 20 10 2805 VFR50 20 10 3769
+3ThebestknownsolutionsforJSPareavailableathttp://optimizizer.com/TA.php,forFSPinstancesseehttps://ars.
+els-cdn.com/content/image/1-s2.0-S0377221714005992-mmc1.pdf,andforFJSP,refertoSchuttetal.(2013).
+
+--- PAGE 21 ---
+21
+Table6 Best-Knownsolutions(BKS)forHurinketal.(1994)FlexibleJobShopSchedulinginstancesedata,vdata,
+rdata,respectively.Valuesinboldindicateoptimalsolutions.
+Hurink-edata Hurink-rdata Hurink-vdata
+instance BKS instance BKS instance BKS instance BKS instance BKS instance BKS
+abz5 1167 la21 1009 abz5 954 la21 835 abz5 859 la21 803
+abz6 925 la22 880 abz6 807 la22 760 abz6 742 la22 736
+abz7 622 la23 950 abz7 544 la23 842 abz7 495 la23 811
+abz8 644 la24 908 abz8 555 la24 804 abz8 509 la24 775
+abz9 648 la25 936 abz9 545 la25 787 abz9 500 la25 756
+car1 6176 la26 1106 car1 5034 la26 1061 car1 5006 la26 1054
+car2 6327 la27 1181 car2 5985 la27 1056 car2 5929 la27 1084
+car3 6856 la28 1147 car3 5623 la28 1080 car3 5599 la28 1070
+car4 7789 la29 1107 car4 6514 la29 998 car4 6514 la29 994
+car5 7229 la30 1204 car5 5615 la30 1078 car5 4919 la30 1069
+car6 7990 la31 1532 car6 6147 la31 1521 car6 5486 la31 1520
+car7 6123 la32 1698 car7 4425 la32 1659 car7 4281 la32 1658
+car8 7689 la33 1547 car8 5692 la33 1499 car8 4613 la33 1497
+la01 609 la34 1599 la01 570 la34 1536 la01 570 la34 1535
+la02 655 la35 1736 la02 529 la35 1550 la02 529 la35 1549
+la03 550 la36 1160 la03 477 la36 1023 la03 477 la36 948
+la04 568 la37 1397 la04 502 la37 1066 la04 502 la37 986
+la05 503 la38 1141 la05 457 la38 954 la05 457 la38 943
+la06 833 la39 1184 la06 799 la39 1011 la06 799 la39 922
+la07 762 la40 1144 la07 749 la40 955 la07 749 la40 955
+la08 845 mt06 55 la08 765 mt06 47 la08 765 mt06 47
+la09 878 mt10 871 la09 853 mt10 686 la09 853 mt10 655
+la10 866 mt20 1088 la10 804 mt20 1022 la10 804 mt20 1022
+la11 1103 orb1 977 la11 1071 orb1 746 la11 1071 orb1 695
+la12 960 orb2 865 la12 936 orb2 696 la12 936 orb2 620
+la13 1053 orb3 951 la13 1038 orb3 712 la13 1038 orb3 648
+la14 1123 orb4 984 la14 1070 orb4 753 la14 1070 orb4 753
+la15 1111 orb5 842 la15 1089 orb5 639 la15 1089 orb5 584
+la16 892 orb6 958 la16 717 orb6 754 la16 717 orb6 715
+la17 707 orb7 389 la17 646 orb7 302 la17 646 orb7 275
+la18 842 orb8 894 la18 666 orb8 639 la18 663 orb8 573
+la19 796 orb9 933 la19 700 orb9 694 la19 617 orb9 659
+la20 857 orb10 933 la20 756 orb10 742 la20 756 orb10 681
+Table7 Best-Knownsolutions(BKS)forBrandimarte(1993)FlexibleJobShopSchedulinginstances1-10,
+respectively.Valuesinboldindicateoptimalsolutions.
+Brandimarte1-10
+instance BKS
+Mk01 40
+Mk02 26
+Mk03 204
+Mk04 60
+Mk05 172
+Mk06 58
+Mk07 139
+Mk08 523
+Mk09 307
+Mk10 197
+
+--- PAGE 22 ---
+22
+AppendixB: ExtendedPerformanceResults
+Table8 PerformanceResultsJSP(Taillard(1993)instances:15x15to30x15)
+TA15x15 TA20x15 TA20x20 TA30x15
+obj gap obj gap obj gap obj gap
+CP-SAT 1229 0,01 1373,9 0,66 1628,8 0,71 1813,1 1,28
+MILP 1232,2 0,27 1422,2 4,20 1664,2 2,90 1958,1 9,38
+SPT 1546,1 25,81 1813,5 32,87 2067 27,81 2419,3 35,14
+MWR 1464,3 19,16 1683,6 23,35 1969,8 21,80 2214,8 23,72
+MOR 1481,3 20,54 1686,7 23,58 1968,3 21,70 2195,8 22,66
+GA100x100 1583,8 28,88 1847,1 35,33 2304,2 42,47 2493 39,26
+L2D5x5greedy 1589,1 29,31 1869,9 37,00 2271,8 40,47 2436,2 36,09
+L2D5x5sample 1760,2 43,23 2083,7 52,66 2610,6 61,42 2852,9 59,36
+L2D10x10greedy 1584,8 28,96 1759 28,87 2090,8 29,28 2315,2 29,33
+L2D10x10sample 1623,6 32,12 1900,3 39,23 2340,2 44,70 2564,7 43,26
+L2D20x20greedy 1522,3 23,88 1813,4 32,86 2130,2 31,71 2348,7 31,20
+L2D20x20sample 1543,8 25,62 1779,7 30,39 2134,2 31,96 2396 33,84
+FJSP-DRL5x5greedy 1529,8 24,49 1802,5 32,06 2068,8 27,92 2383,8 33,16
+FJSP-DRL5x5sample 1425,9 16,03 1660,7 21,67 1934,7 19,63 2203,6 23,09
+FJSP-DRL10x10greedy 1560,7 27,00 1743,6 27,75 2035,3 25,85 2253,2 25,86
+FJSP-DRL10x10sample 1395,1 13,52 1613,8 18,24 1897,9 17,35 2132,8 19,14
+FJSP-DRL20x20greedy 1491 21,33 1715,9 25,72 1994,8 23,34 2315 29,32
+FJSP-DRL20x20sample 1420,9 15,62 1645,2 20,54 1933 19,52 2183,1 21,95
+DANIEL5x5greedy 1453,1 18,24 1669,7 22,33 1937,3 19,79 2188,7 22,26
+DANIEL5x5sample 1407,1 14,50 1593,9 16,78 1858,5 14,91 2121,5 18,51
+DANIEL10x10greedy 1462,6 19,02 1666,7 22,11 1908,9 18,03 2178,2 21,67
+DANIEL10x10sample 1391,4 13,22 1602,2 17,39 1831,6 13,25 2098,1 17,20
+DANIEL20x20greedy 1454,6 18,37 1676,2 22,81 1936,8 19,76 2196,3 22,68
+DANIEL20x20sample 1417 15,31 1607,5 17,77 1860 15,01 2102,3 17,43
+BKS 1228,9 1364,9 1617,3 1790,2
+Table9 PerformanceResultsJSP(Taillard(1993)instances:30x20to100x20)
+TA30x20 TA50x15 TA50x20 TA100x20
+obj gap obj gap obj gap obj gap
+CP-SAT 2009,9 3,15 2773,8 0,00 2850,3 0,23 5365,7 0,00
+MILP 2172,9 11,52 - - - - 5365,7 0,00
+SPT 2619,1 34,42 3441 24,05 3570,8 25,56 6139 14,41
+MWR 2439 25,17 3240 16,81 3352,8 17,89 5812,2 8,32
+MOR 2433,6 24,90 3254,5 17,33 3346,9 17,69 5856,9 9,15
+GA100x100 2925,6 50,15 3439,5 24,00 3965,9 39,45 6251 16,50
+L2D5x5greedy 2927,6 50,25 3631,2 30,91 4424,5 55,58 7035,2 31,11
+L2D5x5sample 3430 76,03 4164,2 50,13 4815,7 69,33 8255,2 53,85
+L2D10x10greedy 2584,3 32,63 3366,5 21,37 3538,1 24,41 6105,7 13,79
+L2D10x10sample 2997,3 53,83 3780,9 36,31 4262,5 49,88 7328,3 36,58
+L2D20x20greedy 2585,6 32,70 3364,9 21,31 3546,9 24,72 6129,9 14,24
+L2D20x20sample 2749,3 41,10 3488,8 25,78 3821 34,36 6668,9 24,29
+FJSP-DRL5x5greedy 2613,1 34,11 3438,9 23,98 3587,1 26,13 6226,2 16,04
+FJSP-DRL5x5sample 2470,1 26,77 3205,9 15,58 3383,3 18,97 5940,6 10,71
+FJSP-DRL10x10greedy 2531,8 29,94 3313,9 19,47 3443,1 21,07 5862,9 9,27
+FJSP-DRL10x10sample 2385,5 22,43 3118,3 12,42 3289,4 15,67 5723,6 6,67
+FJSP-DRL20x20greedy 2540 30,36 3355,3 20,96 3526,5 24,00 6247,1 16,43
+FJSP-DRL20x20sample 2442,7 25,36 3207,5 15,64 3372,2 18,58 5932,7 10,57
+DANIEL5x5greedy 2421,9 24,30 3204,2 15,52 3308 16,32 5784,9 7,81
+DANIEL5x5sample 2337,7 19,97 3142,9 13,31 3232,8 13,67 5705,9 6,34
+DANIEL10x10greedy 2401,2 23,23 3183,2 14,76 3298 15,97 5758,8 7,33
+DANIEL10x10sample 2317,7 18,95 3126,8 12,73 3217 13,12 5681,2 5,88
+DANIEL20x20greedy 2407,5 23,56 3205,9 15,58 3304,4 16,19 5740,5 6,99
+DANIEL20x20sample 2315,5 18,84 3122,7 12,58 3220,7 13,25 5644,4 5,19
+BKS 1948,5 2773,8 2843,9 5365,7
+
+--- PAGE 23 ---
+23
+Table10 PerformanceResultsFSP(Valladaetal.(2015)instances:10x10to50x20)
+VRF10x10 VRF10x20 VRF30x10 VRF30x20 VRF50x10 VRF50x20
+obj gap obj gap obj gap obj gap obj gap obj gap
+CP-SAT 1034,7 0,00 1626,9 0,00 2015,6 1,72 2841,2 3,50 3133,4 3,15 4037,1 7,96
+MILP 1034,7 0,00 1634,3 0,45 2254,8 13,79 3298,3 20,15 4671,2 53,77 - -
+SPT 1216,3 17,55 1880,9 15,61 2320,6 17,11 3197,3 16,47 3450,1 13,58 4434,3 18,58
+MRW 1243,9 20,22 1936,6 19,04 2570,7 29,73 3462,7 26,14 3830,8 26,11 4767,1 27,48
+MOR 1263,9 22,15 1971,9 21,21 2515,6 26,95 3421,9 24,65 3798 25,03 4758,1 27,24
+GA100x100 1108 7,08 1750,9 7,62 2307,6 16,45 3184,2 15,99 3630,8 19,52 4459,3 19,25
+L2D5x5greedy 1523,6 47,25 2287,1 40,58 3984,6 101,08 4364,8 59,00 4845,7 59,52 6045,2 61,65
+L2D5x5sample 1462,4 41,34 2539,9 56,12 4336,7 118,85 6625,2 141,34 7738,3 154,74 10834,7 189,73
+L2D10x10greedy 1360 31,44 2072,3 27,38 2596 31,01 3704 34,93 4366,3 43,74 5315,4 42,14
+L2D10x10sample 1331,5 28,68 2351,5 44,54 3759,7 89,73 6015 119,11 6817 124,41 10523,7 181,41
+L2D20x20greedy 1306,6 26,28 1921,4 18,10 2602,5 31,33 3460,1 26,04 3853 26,84 4847,7 29,63
+L2D20x20sample 1237 19,55 1966,7 20,89 2954,3 49,09 4059,9 47,89 4899,9 61,30 6363 70,15
+FJSP-DRL5x5greedy 1243,9 20,22 1996,4 22,71 2641,8 33,32 3483,9 26,91 4019,7 32,33 4907,8 31,24
+FJSP-DRL5x5sample 1149,6 11,10 1784,1 9,66 2334,2 17,79 3208,9 16,89 3531,9 16,27 4495,2 20,21
+FJSP-DRL10x10greedy 1253,9 21,18 1976,7 21,50 2669 34,69 3520,8 28,25 4047,9 33,26 4808,8 28,59
+FJSP-DRL10x10sample 1156 11,72 1817,9 11,74 2385,1 20,36 3232,7 17,76 3613,2 18,95 4521,9 20,92
+FJSP-DRL20x20greedy 1236,4 19,49 1949,4 19,82 2545,3 28,45 3426,3 24,81 3825,4 25,93 4700,8 25,70
+FJSP-DRL20x20sample 1151 11,24 1795,5 10,36 2331,8 17,67 3184,8 16,01 3551,5 16,91 4478,3 19,75
+DANIEL5x5greedy 1247,3 20,55 1960,4 20,50 2532,5 27,80 3425,5 24,78 3731,4 22,84 4703,6 25,78
+DANIEL5x5sample 1205,8 16,54 1898,7 16,71 2415,3 21,89 3299,9 20,21 3624,3 19,31 4560,4 21,95
+DANIEL10x10greedy 1227,8 18,66 1943,9 19,48 2427,9 22,52 3346,8 21,91 3618 19,10 4560 21,94
+DANIEL10x10sample 1193 15,30 1888,7 16,09 2347,1 18,44 3237,1 17,92 3540,7 16,56 4447,5 18,93
+DANIEL20x20greedy 1256,6 21,45 1940,8 19,29 2431,3 22,69 3367,8 22,68 3581,2 17,89 4501,6 20,38
+DANIEL20x20sample 1228,5 18,73 1863,4 14,54 2346,4 18,41 3224,2 17,45 3473,1 14,33 4368,8 16,83
+BKS 1034,7 1626,9 1981,6 2745,2 3037,7 3739,6
+Table11 ResultsFJSP(Brandimarte(1993)&Hurinketal.(1994)instances)
+Brandimarte Hurink(edata) Hurink(rdata) Hurink(vdata)
+obj gap obj gap obj gap obj gap
+CP-SAT 173,7 0,64 1697,1 0,00 1427,7 0,09 1367,2 0,09
+MILP 180,6 4,63 1711,6 0,86 1448,7 1,56 1394,4 2,08
+SPT 268 55,27 2053,0 20,97 1813,8 27,16 1622,0 18,74
+MWR-SPT 245 41,95 2053,9 21,03 1690,9 18,55 1439,0 5,35
+MWR-EET 186,1 7,82 2052,1 20,92 1692,9 18,69 1447,0 5,93
+MOR-SPT 244,9 41,89 2096,8 23,56 1719,6 20,56 1519,7 11,26
+MOR-EET 186,1 7,82 2052,0 20,92 1692,9 18,68 1447,1 5,94
+GA100x100 207,4 20,16 1942,2 14,44 1840,5 29,03 1750,6 28,16
+FJSP-DRL5x5greedy 221 28,04 2125,3 25,24 1679,3 17,73 1544,2 13,05
+FJSP-DRL5x5sample 197,9 14,66 1893,6 11,58 1574,4 10,38 1417,8 3,80
+FJSP-DRL10x10greedy 206,1 19,41 2103,9 23,97 1665,2 16,74 1462,5 7,07
+FJSP-DRL10x10sample 192,4 11,47 1904,6 12,23 1526,9 7,05 1387,8 1,60
+FJSP-DRL20x20greedy 237,3 37,49 2130,8 25,56 1733,0 21,50 1524,2 11,59
+FJSP-DRL20x20sample 200,7 16,28 1899,1 11,91 1561,8 9,50 1410,5 3,27
+DANIEL5x5greedy 185,3 7,36 2032,3 19,76 1617,0 13,36 1436,3 5,15
+DANIEL5x5sample 181,4 5,10 1938,6 14,23 1525,0 6,91 1389,3 1,71
+DANIEL10x10greedy 185 7,18 2010,1 18,45 1647,9 15,53 1442,5 5,61
+DANIEL10x10sample 181,2 4,98 1918,8 13,07 1542,0 8,11 1385,8 1,46
+DANIEL20x20greedy 186,9 8,29 2060,9 21,44 1674,6 17,40 1461,4 6,99
+DANIEL20x20sample 182,4 5,68 1970,3 16,11 1562,1 9,51 1396,5 2,23
+BKS 172,6 1697,0 1426,4 1365,9
+
+--- PAGE 24 ---
+24
+References
+AdamsJ,BalasE,ZawackD(1988)Theshiftingbottleneckprocedureforjobshopscheduling.Managementscience
+34(3):391–401.
+BarnesJ,ChambersJ(1996)Flexiblejobshopschedulingbytabusearch,graduateprograminoperationsresearchand
+industrialengineering.TheUniversityofTexasatAustin.
+Birgin EG, Feofiloff P, Fernandes CG, De Melo EL, Oshiro MT, Ronconi DP (2014) A milp model for an extended
+versionoftheflexiblejobshopproblem.OptimizationLetters8:1417–1431.
+BlackstoneJH,PhillipsDT,HoggGL(1982)Astate-of-the-artsurveyofdispatchingrulesformanufacturingjobshop
+operations.TheInternationalJournalofProductionResearch20(1):27–45.
+Blaz˙ewicz J, Pesch E, Sterna M (2000) The disjunctive graph machine representation of the job shop scheduling
+problem.EuropeanJournalofOperationalResearch127(2):317–331.
+Brandimarte P (1993) Routing and scheduling in a flexible job shop by tabu search. Annals of Operations research
+41(3):157–183.
+Dauze`re-Pe´re`sS,PaulliJ(1994)Solvingthegeneralmultiprocessorjob-shopschedulingproblem.ManagementReport
+Series182.
+DemirkolE,MehtaS,UzsoyR(1998)Benchmarksforshopschedulingproblems.EuropeanJournalofOperational
+Research109(1):137–141.
+Fattahi P, Saidi Mehrabad M, Jolai F (2007) Mathematical modeling and heuristic approaches to flexible job shop
+schedulingproblems.Journalofintelligentmanufacturing18(3):331–342.
+Holthaus O, Rajendran C (1997) Efficient dispatching rules for scheduling in a job shop. International Journal of
+ProductionEconomics48(1):87–105.
+HurinkJ,JurischB,TholeM(1994)Tabusearchforthejob-shopschedulingproblemwithmulti-purposemachines.
+Operations-Research-Spektrum15:205–215.
+KacemI,HammadiS,BorneP(2002)Pareto-optimalityapproachforflexiblejob-shopschedulingproblems:hybridiza-
+tionofevolutionaryalgorithmsandfuzzylogic.Mathematicsandcomputersinsimulation60(3-5):245–276.
+ManneAS(1960)Onthejob-shopschedulingproblem.Operationsresearch8(2):219–223.
+Perron L, Didier F, Gay S (2023) The cp-sat-lp solver. Yap RHC, ed., 29th International Conference on Principles
+and Practice of Constraint Programming (CP 2023), volume 280 of Leibniz International Proceedings in
+Informatics(LIPIcs),3:1–3:2(Dagstuhl,Germany:SchlossDagstuhl–Leibniz-Zentrumfu¨rInformatik),ISBN
+978-3-95977-300-3,ISSN1868-8969,URLhttp://dx.doi.org/10.4230/LIPIcs.CP.2023.3.
+Roshanaei V, Azab A, ElMaraghy H (2013) Mathematical modelling and a meta-heuristic for flexible job shop
+scheduling.InternationalJournalofProductionResearch51(20):6247–6274.
+Schutt A, Feydy T, Stuckey PJ (2013) Scheduling optional tasks with explanation. International Conference on
+PrinciplesandPracticeofConstraintProgramming,628–644(Springer).
+
+--- PAGE 25 ---
+25
+ShenL,Dauze`re-Pe´re`sS,NeufeldJS(2018)Solvingtheflexiblejobshopschedulingproblemwithsequence-dependent
+setuptimes.Europeanjournalofoperationalresearch265(2):503–516.
+SmitIG,ZhouJ,ReijnenR,WuY,ChenJ,ZhangC,BukhshZ,ZhangY,NuijtenW(2024)Graphneuralnetworks
+forjobshopschedulingproblems:Asurvey.Computers&OperationsResearch106914.
+SongW,ChenX,LiQ,CaoZ(2022)Flexiblejob-shopschedulingviagraphneuralnetworkanddeepreinforcement
+learning.IEEETransactionsonIndustrialInformatics19(2):1600–1610.
+TaillardE(1993)Benchmarksforbasicschedulingproblems.europeanjournalofoperationalresearch64(2):278–285.
+ValladaE,RuizR,FraminanJM(2015)Newhardbenchmarkforflowshopschedulingproblemsminimisingmakespan.
+EuropeanJournalofOperationalResearch240(3):666–677.
+Wang L, Hu X, Wang Y, Xu S, Ma S, Yang K, Liu Z, Wang W (2021) Dynamic job-shop scheduling in smart
+manufacturingusingdeepreinforcementlearning.ComputerNetworks190:107969.
+Wang R, Wang G, Sun J, Deng F, Chen J (2023) Flexible job shop scheduling via dual attention network-based
+reinforcementlearning.IEEETransactionsonNeuralNetworksandLearningSystems.
+Xie J, Gao L, Peng K, Li X, Li H (2019) Review on flexible job shop scheduling. IET Collaborative Intelligent
+Manufacturing1(3):67–77.
+XiongH,ShiS,RenD,HuJ(2022)Asurveyofjobshopschedulingproblem:Thetypesandmodels.Computers&
+OperationsResearch142:105731.
+Zhang C, Song W, Cao Z, Zhang J, Tan PS, Chi X (2020) Learning to dispatch for job shop scheduling via deep
+reinforcementlearning.Advancesinneuralinformationprocessingsystems33:1621–1632.
+Zhang G, Gao L, Shi Y (2011) An effective genetic algorithm for the flexible job-shop scheduling problem. Expert
+SystemswithApplications38(4):3563–3573.
+ZhangJ,DingG,ZouY,QinS,FuJ(2019)Reviewofjobshopschedulingresearchanditsnewperspectivesunder
+industry4.0.Journalofintelligentmanufacturing30:1809–1830.

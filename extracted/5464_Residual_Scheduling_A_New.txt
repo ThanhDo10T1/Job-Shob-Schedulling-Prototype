@@ -1,0 +1,1121 @@
+
+--- PAGE 1 ---
+Residual Scheduling: A New Reinforcement Learning
+Approach to Solving Job Shop Scheduling Problem
+AnonymousAuthor(s)
+Affiliation
+Address
+email
+Abstract
+Job-shopschedulingproblem(JSP)isamathematicaloptimizationproblemwidely
+1
+usedinindustrieslikemanufacturing,andflexibleJSP(FJSP)isalsoacommon
+2
+variant. SincetheyareNP-hard,itisintractabletofindtheoptimalsolutionfor
+3
+allcaseswithinreasonabletimes. Thus,itbecomesimportanttodevelopefficient
+4
+heuristicstosolveJSP/FJSP.Akindofmethodofsolvingschedulingproblems
+5
+is construction heuristics, which constructs scheduling solutions via heuristics.
+6
+Recently,manymethodsforconstructionheuristicsleveragedeepreinforcement
+7
+learning(DRL)withgraphneuralnetworks(GNN).Inthispaper,weproposeanew
+8
+approach,namedresidualscheduling,tosolvingJSP/FJSP.Inthisnewapproach,
+9
+weremoveirrelevantmachinesandjobssuchasthosefinished,suchthatthestates
+10
+includetheremaining(orrelevant)machinesandjobsonly. Ourexperimentsshow
+11
+thatourapproachreachesstate-of-the-art(SOTA)amongallknownconstruction
+12
+heuristicsonmostwell-knownopenJSPandFJSPbenchmarks. Inaddition,we
+13
+also observe that even though our model is trained for scheduling problems of
+14
+smallersizes,ourmethodstillperformswellforschedulingproblemsoflargesizes.
+15
+Interestinglyinourexperiments,ourapproachevenreacheszerogapfor49among
+16
+50JSPinstanceswhosejobnumbersaremorethan150on20machines.
+17
+1 Introduction
+18
+Thejob-shopschedulingproblem(JSP)isamathematicaloptimization(MO)problemwidelyusedin
+19
+manyindustries,likemanufacturing(Zhangetal.,2020;Waschnecketal.,2016). Forexample,a
+20
+semiconductormanufacturingprocesscanbeviewedasacomplexJSPproblem(Waschnecketal.,
+21
+2016),whereasetofgivenjobsareassignedtoasetofmachinesundersomeconstraintstoachieve
+22
+someexpectedgoalssuchasminimizingmakespanwhichisfocusedoninthispaper. Whilethereare
+23
+manyvariantsofJSP(Abdolrazzagh-NezhadandAbdullah,2017),wealsoconsideranextension
+24
+calledflexibleJSP(FJSP)wherejoboperationscanbedoneondesignatedmachines.
+25
+AgenericapproachtosolvingMOproblemsistousemathematicalprogramming,suchasmixed
+26
+integerlinearprogramming(MILP)andconstraintsatisfactionproblem(CSP).Twopopulargeneric
+27
+MO solvers for solving MO are OR-Tools (Perron and Furnon, 2019) and IBM ILOG CPLEX
+28
+Optimizer(abbr. CPLEX)(Cplex,2009). However,bothJSPandFJSP,aswellasmanyotherMO
+29
+problems,havebeenshowntobeNP-hard(GareyandJohnson,1979;Lagewegetal.,1977). That
+30
+said,itisunrealisticandintractabletofindtheoptimalsolutionforallcaseswithinreasonabletimes.
+31
+Thesetoolscanobtaintheoptimalsolutionsifsufficienttime(orunlimitedtime)isgiven;otherwise,
+32
+returnbest-effortsolutionsduringthelimitedtime,whichusuallyhavegapstotheoptimum. When
+33
+problemsarescaledup,thegapsusuallygrowsignificantly.
+34
+Inpractice, someheuristics(GuptaandSivakumar,2006;Haupt,1989)orapproximatemethods
+35
+(Jansenetal.,2000)wereusedtocopewiththeissueofintractability. Asimplegreedyapproachisto
+36
+Submittedto37thConferenceonNeuralInformationProcessingSystems(NeurIPS2023).Donotdistribute.
+
+--- PAGE 2 ---
+usetheheuristicsfollowingtheso-calledprioritydispatchingrule(PDR)(Haupt,1989)toconstruct
+37
+solutions. Thesecanalsobeviewedasakindofsolutionconstructionheuristicsorconstruction
+38
+heuristics. SomeofPDRexamplesareFirstInFirstOut(FIFO),ShortestProcessingTime(SPT),
+39
+MostWorKRemaining(MWKR),andMostOperationRemaining(MOR).Althoughtheseheuristics
+40
+areusuallycomputationallyfast,itishardtodesigngenerallyeffectiverulestominimizethegapto
+41
+theoptimum,andthederivedresultsareusuallyfarfromtheoptimum.
+42
+Furthermore,agenericapproachtoautomatingthedesignofheuristicsiscalledmetaheuristics,such
+43
+astabusearch(Dell’AmicoandTrubian,1993;Saidi-MehrabadandFattahi,2007),geneticalgorithm
+44
+(GA)(Pezzellaetal.,2008;RenandWang,2012),andPSOalgorithms(Lianetal.,2006;Liuetal.,
+45
+2011). However,metaheuristicsstilltakeahighcomputationtime,anditisnotensuredtoobtainthe
+46
+optimalsolutioneither.
+47
+Recently, deep reinforcement learning (DRL) has made several significant successes for some
+48
+applications,suchasAlphaGo(Silveretal.,2016),AlphaStar(Vinyalsetal.,2019),AlphaTensor
+49
+(Fawzietal.,2022),andthusitalsoattractedmuchattentionintheMOproblems,includingchip
+50
+design(Mirhoseinietal.,2021)andschedulingproblems(Zhangetal.,2023). Inthepast,several
+51
+researchersusedDRLmethodsasconstructionheuristics,andtheirmethodsdidimprovescheduling
+52
+performance,illustratedasfollows. Parketal.(2020)proposedamethodbasedonDQN(Mnihetal.,
+53
+2015)forJSPinsemiconductormanufacturingandshowedthattheirDQNmodeloutperformedGA
+54
+intermsofbothschedulingperformance(namelygaptotheoptimumonmakespan)andcomputation
+55
+time.Linetal.(2019)andLuo(2020)proposeddifferentDQNmodelstodecidetheschedulingaction
+56
+amongtheheuristicrulesandimprovedthemakespanandthetardinessoverPDRs,respectively.
+57
+ArecentDRL-basedapproachtosolvingJSP/FJSPproblemsistoleveragegraphneuralnetworks
+58
+(GNN)todesignasize-agnosticrepresentation(Zhangetal.,2020;Parketal.,2021b,a;Songetal.,
+59
+2023). Inthisapproach, graphrepresentationhasbettergeneralizationabilityinlargerinstances
+60
+and provides a holistic view of scheduling states. Zhang et al. (2020) proposed a DRL method
+61
+withdisjunctivegraphrepresentationforJSP,calledL2D(LearningtoDispatch),andusedGNN
+62
+toencodethegraphforschedulingdecision. Besides, Songetal.(2023)extendedtheirmethods
+63
+toFJSP.Parketal.(2021b)usedasimilarstrategyof(Zhangetal.,2020)butwithdifferentstate
+64
+featuresandmodelstructure. Parketal.(2021a)proposedanewapproachtosolvingJSP,called
+65
+ScheduleNet,byusingadifferentgraphrepresentationandaDRLmodelwiththegraphattentionfor
+66
+schedulingdecision. Mostoftheexperimentsaboveshowedthattheirmodelstrainedfromsmall
+67
+instancesstillworkedreasonablywellforlargetestinstances,andgenerallybetterthanPDRs.Among
+68
+these methods, ScheduleNet achieved state-of-the-art (SOTA) performance. There are still other
+69
+DRL-basedapproachestosolvingJSP/FJSPproblems,butnotconstructionheuristics. Zhangetal.
+70
+(2022)proposesanotherapproach,calledLearningtoSearch(L2S),akindofsearch-basedheuristics.
+71
+Inthispaper,weproposeanewapproachtosolvingJSP/FJSP,akindofconstructionheuristics,also
+72
+basedonGNN.Inthisnewapproach,weremoveirrelevantmachinesandjobs,suchasthosefinished,
+73
+suchthatthestatesincludetheremainingmachinesandjobsonly. Thisapproachisnamedresidual
+74
+schedulinginthispapertoindicatetoworkontheremaininggraph.
+75
+Withoutirrelevantinformation,ourexperimentsshowthatourapproachreachesSOTAbyoutper-
+76
+formingtheabovementionedconstructionmethodsonsomewell-knownopenbenchmarks,seven
+77
+forJSPandtwoforFJSP,asdescribedinSection4. Wealsoobservethateventhoughourmodel
+78
+istrainedforschedulingproblemsofsmallersizes,ourmethodstillperformswellforscheduling
+79
+problemsoflargesizes. Interestinglyinourexperiments,ourapproachevenreacheszerogapfor49
+80
+among50JSPinstanceswhosejobnumbersaremorethan150on20machines.
+81
+2 ProblemFormulation
+82
+2.1 JSPandFJSP
+83
+An×mJSPinstancecontainsnjobsandmmachines. EachjobJ consistsofasequenceofk
+84 j j
+operations {O ,...,O }, where operation O must be started after O is finished. One
+85 j,1 j,kj j,i j,i−1
+machinecanprocessatmostoneoperationatatime,andpreemptionisnotalloweduponprocessing
+86
+operations. InJSP,oneoperationO isallowedtobeprocessedononedesignatedmachine,denoted
+87 j,i
+byM ,withaprocessingtime,denotedbyT(op). Table1(a)illustratesa3×3JSPinstance,where
+88 j,i j,i
+thethreejobshave3,3,2operationsrespectively,eachofwhichisdesignatedtobeprocessedon
+89
+2
+
+--- PAGE 3 ---
+oneofthethreemachines{M ,M ,M }inthetable. AsolutionofaJSPinstanceistodispatchall
+90 1 2 3
+operationsO tothecorrespondingmachineM attimeτ(s),suchthattheaboveconstraintsare
+91 j,i j,i j,i
+satisfied. Twosolutionsoftheabove3x3JSPinstancearegiveninFigure1(a)and(b).
+92
+Table1: JSPandFJSPinstances
+(a) A3×3JSPinstance (b) A3×3FJSPinstance
+Job Operation M M M Job Operation M M M
+1 2 3 1 2 3
+O 3 O 3 2
+1,1 1,1
+Job1 O 5 Job1 O 3 5
+1,2 1,2
+O 4 O 4 3
+1,3 1,3
+O 2 O 2
+2,1 2,1
+Job2 O 4 Job2 O 4
+2,2 2,2
+O 3 O 3
+2,3 2,3
+O 3 O 3 4
+Job3 3,1 Job3 3,1
+O 2 O 2 2
+3,2 3,2
+(a) (b) (c) (d)
+Figure1: Both(a)and(b)aresolutionsofthe3x3JSPinstanceinTable1(a),andtheformerhasthe
+minimalmakespan,12. Both(c)and(d)aresolutionsofthe3x3FJSPinstanceinTable1(b),andthe
+formerhastheminimalmakespan,9.
+Whiletherearedifferentexpectedgoals,suchasmakespan,tardiness,etc.,thispaperfocuseson
+93
+makespan. Letthefirstoperationstartattimeτ =0inaJSPsolutioninitially. Themakespanofthe
+94
+solutionisdefinedtobeT(mksp) = max(τ(c))foralloperationsO ,whereτ(c) = τ(s)+T(op)
+95 j,i j,i j,i j,i j,i
+denotesthecompletiontimeofO . ThemakespansforthetwosolutionsillustratedinFigure1(a)
+96 j,i
+and(b)are12and15respectively. Theobjectiveistoderiveasolutionthatminimizesthemakespan
+97
+T(mksp),andthesolutionofFigure1(a)reachestheoptimal.
+98
+A n × m FJSP instance is also a n × m JSP instance with the following difference. In FJSP,
+99
+alloperationsO areallowedtobedispatchedtomultipledesignatedmachineswithdesignated
+100 j,i
+processing times. Table 1 (b) illustrates a 3×3 FJSP instance, where multiple machines can be
+101
+designatedtobeprocessedforoneoperation. Figure1(c)illustratesasolutionofanFJSPinstance,
+102
+whichtakesashortertimethanthatinFigure1(d).
+103
+2.2 ConstructionHeuristics
+104
+Anapproachtosolvingtheseschedulingproblemsistoconstructsolutionsstepbystepinagreedy
+105
+manner,andtheheuristicsbasedonthisapproachiscalledconstructionheuristicsinthispaper. In
+106
+theapproachofconstructionheuristics,aschedulingsolutionisconstructedthroughasequenceof
+107
+partialsolutionsinachronicleorderofdispatchingoperationsstepbystep,definedasfollows. The
+108
+t-thpartialsolutionS associateswithadispatchingtimeτ andincludesapartialsetofoperations
+109 t t
+thathavebeendispatchedbyτ (inclusive)whilesatisfyingtheaboveJSPconstraints,andallthe
+110 t
+remainingoperationsmustbedispatchedafterτ (inclusive). ThewholeconstructionstartswithS
+111 t 0
+wherenoneofoperationshavebeendispatchedandthedispatchingtimeisτ =0. ForeachS ,aset
+112 0 t
+ofoperationstobechosenfordispatchingformasetofpairsof(M,O),calledcandidatesC ,where
+113 t
+operationsOareallowedtobedispatchedonmachinesM atτ . Anagent(oraheuristicalgorithm)
+114 t
+choosesonefromcandidatesC fordispatching,andtransitsthepartialsolutiontothenextS . If
+115 t t+1
+thereexistsnooperationsfordispatching,thewholesolutionconstructionprocessisdoneandthe
+116
+partialsolutionisasolution,sincenofurtheroperationsaretobedispatched.
+117
+3
+
+--- PAGE 4 ---
+(a) S (b) S (c) S
+0 1 2
+(d) S (e) S (f) S
+3 4 5
+(g) S (h) S (i) S
+6 7 8
+Figure2: Solutionconstruction,asequenceofpartialsolutionsfromS toS .
+0 8
+Figure2illustratesasolutionconstructionprocessforthe3x3JSPinstanceinTable1(a),constructed
+118
+throughninepartialsolutionsstepbystep. TheinitialpartialsolutionS startswithoutanyoperations
+119 0
+dispatchedasinFigure2(a). TheinitialcandidatesC are{(M ,O ),(M ,O ),(M ,O )}.
+120 0 1 1,1 3 2,1 1 3,1
+Followingsomeheuristic,constructasolutionfrompartialsolutionS toS stepbystepasinthe
+121 0 9
+Figure,wherethedashedlineinredindicatethetimeτ . ThelastoneS ,thesameastheonein
+122 t 9
+Figure1(a),isasolution,sincealloperationshavebeendispatched,andthelastoperationendsat
+123
+time12,themakespanofthesolution.
+124
+ForFJSP,theprocessofsolutionconstructionisalmostthesameexceptforthatoneoperationhave
+125
+multiplechoicesfromcandidates. Besides,anapproachbasedonsolutionconstructioncanbealso
+126
+viewed as the so-called Markov decision process (MDP), and the MDP formulation for solution
+127
+constructionisdescribedinmoredetailintheappendix.
+128
+3 OurApproach
+129
+Inthissection,wepresentanewapproach,calledresidualscheduling,tosolvingschedulingproblems.
+130
+WeintroducetheresidualschedulinginSubsection3.1,describethedesignofthegraphrepresentation
+131
+inSubsection3.2,proposeamodelarchitecturebasedongraphneuralnetworkinSubsection3.3and
+132
+presentamethodtotrainthismodelinSubsection3.4;
+133
+3.1 ResidualScheduling
+134
+Inourapproach,thekeyistoremoveirrelevantinformation,particularlyforoperations,fromstates
+135
+(includingpartialsolutions). Animportantbenefitfromthisisthatwedonotneedtoincludeall
+136
+irrelevantinformationwhiletrainingtominimizethemakespan. Letusillustratebythestateforthe
+137
+partialsolutionS attimeτ =3inFigure2(d). Allprocessingbyτ areirrelevanttotheremaining
+138 3 3 3
+scheduling. SinceoperationsO andO arebothfinishedandirrelevanttherestofscheduling,
+139 1,1 2,1
+theycanberemovedfromthestateofS . Inaddition,operationO isdispatchedattime2(before
+140 3 2,2
+τ = 3) and its processing time is T(op) = 4, so the operation is marked as ongoing. Thus, the
+141 3 2,1
+operationcanbemodifiedtostartatτ =3withaprocessingtime4−(3−2). Thus,themodified
+142 3
+stateforS donotcontainbothO andO ,andmodifyO asabove. Letusconsidertwomore
+143 3 1,1 2,1 2,2
+examples. ForS ,onemoreoperationO isdispatchedandthusmarkedasongoing,however,the
+144 4 2,2
+timeτ remainsunchangedandnomoreoperationsareremoved. Inthiscase,thestateisalmostthe
+145 4
+sameexceptforincludingonemoreongoingoperationO . Then,forS ,twomoreoperationsO
+146 2,2 5 3,1
+4
+
+--- PAGE 5 ---
+andO areremovedandtheongoingoperationO changesitsprocessingtimetotheremaining
+147 2,2 1,2
+time(5-3).
+148
+Forresidualscheduling,wealsoresetthedispatchingtimeτ =0forallstateswithpartialsolutions
+149
+modifiedasabove,sowederivemakespanswhichisalsoirrelevanttotheearlieroperations. Given
+150
+aschedulingpolicyπ,T(mksp)(S)isdefinedtobethemakespanderivedfromanepisodestarting
+151 π
+fromstatesS byfollowingπ,andT(mksp)(S,a)themakespanbytakingactionaonS.
+152 π
+3.2 ResidualGraphRepresentation
+153
+In this paper, our model design is based on graph neural network (GNN), and leverage GNN to
+154
+extracttheschedulingdecisionfromtherelationshipingraph. Inthissubsection, wepresentthe
+155
+graphrepresentation. LikemanyotherresearcherssuchasParketal.(2021a),weformulateapartial
+156
+solutionintoagraphG =(V,E),whereV isasetofnodesandE isasetofedges. Anodeiseithera
+157
+machinenodeM oranoperationnodeO. Anedgeconnectstwonodestorepresenttherelationship
+158
+betweentwonodes,basicallyincludingthreekindsofedges,namelyoperation-to-operation(O →O),
+159
+machine-to-operation(M → O)andoperation-to-machine(O → M). Alloperationsinthesame
+160
+jobarefullyconnectedasO → Oedges. IfanoperationOisabletobeperformedonamachine
+161
+M,thereexistsbothO →M andM →Odirectededges. In(Parketal.,2021a),theyalsoletall
+162
+machinesbefullyconnectedasM →M edges. However,ourexperimentsinsection4showthat
+163
+mutualM →M edgesdonothelpmuchbasedonourResidualScheduling. Anillustrationforgraph
+164
+representationofS isdepictedinFigure3(a).
+165 3
+(a) GraphforS (b) Graphembedding (c) Scorefunction
+3
+Figure3: Graphrepresentationandnetworks.
+Inthegraphrepresentation,allnodesneedtoincludesomeattributessothatapartialsolutionS at
+166
+thedispatchingtimeτ canbesupportedintheMDPformulation(intheappendix). Notethatmanyof
+167
+theattributesbelowarenormalizedtoreducevariance. FornodescorrespondingtooperationsO ,
+168 j,i
+wehavethefollowingattributes:
+169
+Statusϕ : Theoperationstatusϕ iscompletediftheoperationhasbeenfinishedbyτ,ongoingif
+170 j,i j,i
+theoperationisongoing(i.e.,hasbeendispatchedtosomemachinebyτ andisstillbeingprocessed
+171
+atτ),readyiftheoperationdesignatedtothemachinewhichisidlehasnotbeendispatchedyetand
+172
+itsprecedentoperationhasbeenfinished,andunreadyotherwise. Forexample,inFigure3(a),the
+173
+graynodesarecompleted,theredongoing,theyellowreadyandthewhiteunready. Inourresidual
+174
+scheduling,thereexistsnocompletedoperationsinallpartialsolutions,sincetheyareremovesfor
+175
+irrelevanceoftherestofscheduling. Theattributeisaone-hotvectortorepresentthecurrentstatus
+176
+oftheoperation,whichisoneofongoing,readyandunready. IllustrationforallstatesS toS are
+177 0 8
+shownintheappendix.
+178
+NormalizedprocessingtimeT¯(op): LetthemaximalprocessingtimebeT(op) = max (T(op)).
+179 j,i max ∀j,i j,i
+Then,T¯(op) =T(op)/T(op). Inourresidualscheduling,theoperationsthathavebeenfinishedare
+180 j,i j,i max
+removedinpartialsolutionsandthereforetheirprocessingtimecanbeignored;theoperationsthat
+181
+hasnotbeendispatchedyetstillkeeptheirprocessingtimesthesame;theoperationsthatareongoing
+182
+changetheirprocessingtimestotheremainingtimesafterthedispatchingtimeτ . AsforFJSP,the
+183 t
+operationsthathasnotbeendispatchedyetmayhaveseveralprocessingtimesondifferentmachines,
+184
+andthuswecansimplychoosetheaverageoftheseprocessingtimes.
+185
+5
+
+--- PAGE 6 ---
+Normalized job remaining time T¯(job): Let the rest of processing time for job J be T(job) =
+186 j,i j j,i
+(cid:80) T(op),andlettheprocessingtimeforthewholejobj beT(job) = (cid:80) T(op). Inpractice,
+187 ∀i′≥i j,i′ j ∀i′ j,i′
+T(job) isreplacedbytheprocessingtimefortheoriginaljobj. Thus,T¯(job) =T(job)/T(job). For
+188 j j,i j,i j
+FJSP, since operations O can be dispatched to different designated machines M , say with the
+189 j,i l
+processingtimeT(op),wesimplyletT(op)betheaverageofT(op)forallM .
+190 j,i,l j,i j,i,l l
+FormachinenodescorrespondingtomachinesM ,wehavethefollowingattributes:
+191 l
+Machinestatusϕ : Themachinestatusϕ isprocessingifsomeoperationhasbeendispatchedto
+192 l l
+andisbeingprocessedbyM atτ,andidleotherwise(nooperationisbeingprocessedatτ). The
+193 l
+attributeisaone-hotvectortorepresentthecurrentstatus,whichisoneofprocessingandidle.
+194
+NormalizedoperationprocessingtimeT¯(mac): OnthemachineM ,theprocessingtimeT(mac)is
+195 l l l
+T(op)(thesameasthenormalizedprocessingtimefornodeO )ifthemachinestatusisprocessing,
+196 j,i j,i
+i.e.,someongoingoperationO isbeingprocessedbutnotfinishedyet,iszeroifthemachinestatus
+197 j,i
+isidle. Then,thisattributeisnormalizedtoT(op) andthusT¯(mac) =T(mac)/T(op).
+198 max l l max
+Now,consideredgesinaresidualschedulinggraph.Asdescribedabove,thereexiststhreerelationship
+199
+setsforedges,O → O,O → M andM → O. First,forthesamejob,sayJ ,allofitsoperation
+200 j
+nodesforO arefullyconnected. Notethatforresidualschedulingtheoperationsfinishedbythe
+201 j,i
+dispatchingtimeτ areremovedandthushavenoedgestothem. Second,amachinenodeforM is
+202 l
+connectedtoanoperationnodeforO ,iftheoperationO isdesignatedtobeprocessedonthe
+203 j,i j,i
+machineM ,whichformstwoedgesO →M andM →O. Bothcontainsthefollowingattribute.
+204 l
+Normalized operation processing time T¯(edge): The attribute is T¯(edge) = T(op)/T(op). Here,
+205 j,i,l j,i,l j,i max
+T(op) = T(op) inthecaseofFJSP.IfoperationO isongoing(orbeingprocessed),T(op) isthe
+206 j,i j,i,l j,i j,i
+remainingtimeasdescribedabove.
+207
+3.3 GraphNeuralNetwork
+208
+Inthissubsection,wepresentourmodelbasedongraphneuralnetwork(GNN).GNNareafamily
+209
+of deep neural networks (Battaglia et al., 2018) that can learn representation of graph-structured
+210
+data, widely used in many applications (Lv et al., 2021; Zhou et al., 2020). A GNN aggregates
+211
+informationfromnodeitselfanditsneighboringnodesandthenupdatethedataitself,whichallows
+212
+theGNNtocapturethecomplexrelationshipswithinthedatagraph. ForGNN,wechooseGraph
+213
+IsomorphismNetwork(GIN),whichwasshowntohavestrongdiscriminativepower(Xuetal.,2019)
+214
+andsummarilyreviewedasfollows. GivenagraphG =(V,E)andK GNNlayers(K iterations),
+215
+GINperformsthek-thiterationsofupdatingfeatureembeddingh(k)foreachnodev ∈V:
+216
+(cid:88)
+h(k) =MLP(k)((1+ϵ(k))h(k−1)+ h(k−1)), (1)
+v v u
+u∈Nb(v)
+where h(k) is the embedding of node v at the k-th layer, ϵ(k) is an arbitrary number that can be
+217 v
+learned,andN (v)istheneighborsofvviaedgesinE. Notethath(0)referstoitsrawfeaturesfor
+218 b v
+input. MLP(k) isaMulti-LayerPerceptron(MLP)forthek-thlayerwithabatchnormalization
+219
+(IoffeandSzegedy,2015).
+220
+Furthermore,weactuallyuseheterogeneousGIN,alsocalledHGIN,sincetherearetwotypesof
+221
+nodes, machine and operation nodes, and three relations, O → O, O → M and M → O in the
+222
+graphrepresentation. AlthoughwedonothavecrossmachinerelationsM →M asdescribedabove,
+223
+updatingmachinenodesrequirestoincludetheupdatefromitselfasin(1),thatis,thereisalsoone
+224
+morerelationM →M. Thus,HGINencodesgraphinformationbetweenallrelationsbyusingthe
+225
+fourMLPsasfollows,
+226
+h(k+1) = (cid:88) MLP(k+1)((1+ϵ(k+1))h(k)+ (cid:88) h(k)) (2)
+v R R v u
+R u∈NR(v)
+whereRisoneoftheabovefourrelationsandMLP(k)istheMLPforR. Forexample,forS in
+227 R 0
+Figure2(a),theembeddingofM inthe(k+1)-stiterationcanbederivedasfollows.
+228 1
+h(k+1) =MLP(k+1)((1+ϵ(k+1))h(k))+MLP(k+1)(h(k) +h(k) +h(k) ) (3)
+M1 MM MM M1 OM O1,1 O1,2 O1,3
+6
+
+--- PAGE 7 ---
+Similarly,theembeddingofO inthe(k+1)-stiterationis:
+229 1,1
+h(k+1) =MLP(k+1)((1+ϵ(k+1))h(k) +h(k) +h(k) )+MLP(k+1)(h(k)) (4)
+O1,1 OO OO O1,1 O1,2 O1,3 MO M1
+Inourapproach,anactionincludesthetwophases,graphembeddingphaseandactionselectionphase.
+230
+Leth(k)denotethewholeembeddingofthegraphsG,asummationoftheembeddingsofallnodes,
+231 G
+h(k+1). Inthegraphembeddingphase,weuseanHGINtoencodenodeandgraphembeddingsas
+232 v
+describedabove. AnexamplewiththreeHGINlayersisillustratedinFigure3(b).
+233
+Intheactionselectionphase,weselectanactionbasedonapolicy,afternodeandgraphembedding
+234
+are encoded in the graph embedding phase. The policy is described as follows. First, collect all
+235
+readyoperationsO tobedispatchedtomachinesM. Then,forallpairs(M,O),feedtheirnode
+236
+embeddings(h(k),h(k))intoaMLPScore(M,O)tocalculatetheirscoresasshowninFigure3(c).
+237 M O
+Theprobabilityofselecting(M,O)iscalculatedbasedonasoftmaxfunctionofallscores,which
+238
+alsoservesasthemodelpolicyπforthecurrentstate.
+239
+3.4 Policy-BasedRLTraining
+240
+Inthispaper,weproposetouseapolicy-basedRLtrainingmechanismthatfollowsREINFORCE
+241
+(Sutton and Barto, 2018) to update our model by policy gradient with a normalized advantage
+242
+makespanwithrespecttoabaselinepolicyπ asfollows.
+243 b
+T(mksp)(S,a)−T(mksp)(S,a)
+A (S,a)=
+πb π
+(5)
+π T(mksp)(S,a)
+πb
+In this paper, we choose a lightweight PDR, MWKR, as baseline π , which performed best for
+244 b
+makespan among all PDRs reported from the previous work (Zhang et al., 2020). In fact, our
+245
+experimentalsoshowsthatusingMWKRisbetterthantheotherPDRsshownintheappendix. The
+246
+modelforpolicyπisparametrizedbyθ,whichisupdatedby∇ logπ A (S ,a ). Ouralgorithm
+247 θ θ πθ t t
+basedonREINFORCEislistedintheappendix.
+248
+4 Experiments
+249
+4.1 ExperimentalSettingsandEvaluationBenchmarks
+250
+Inourexperiments,thesettingsofourmodelaredescribedasfollows. Allembeddingandhidden
+251
+vectorsinourmodelhaveadimensionof256. ThemodelcontainsthreeHGINlayersforgraph
+252
+embedding,andanMLPforthescorefunction,asshowninFigure3(b)and(c). AllMLPnetworks
+253
+includingthoseinHGINandforscorecontaintwohiddenlayers. Theparametersofourmodel,such
+254
+asMLP,generallyfollowthedefaultsettingsinPyTorch(Paszkeetal.,2019)andPyTorchGeometric
+255
+(FeyandLenssen,2019). Moresettingsareintheappendix.
+256
+Eachofourmodelsistrainedwithonemillionepisodes,eachwithoneschedulinginstance. Each
+257
+instanceisgeneratedbyfollowingtheprocedurewhichisusedtogeneratetheTAdataset(Taillard,
+258
+1993). Given(N,M),weusetheproceduretogenerateann×mJSPinstancebyconformingto
+259
+thefollowingdistribution,n∼U(3,N),m∼U(3,n),andoperationcountk =m,whereU(x,y)
+260 j
+representsadistributionthatuniformlysamplesanintegerinacloseinterval[x,y]atrandom. The
+261
+detailsofdesignationformachinesandprocessingtimesreferto(Taillard,1993)andthusareomitted
+262
+here. Wechoose(10,10)forallexperiments,since(10,10)generallyperformsbetterthantheother
+263
+twoasdescribedintheappendix. FollowingthemethoddescribedinSubsection3.4,themodelis
+264
+updatedfromtheaboverandomlygeneratedinstances. FortestingourmodelsforJSPandFJSP,
+265
+sevenJSPopenbenchmarksandtwoFJSPopenbenchmarksareused,aslistedintheappendix.
+266
+TheperformanceforagivenpolicymethodπonaninstanceismeasuredbythemakespangapG
+267
+definedas
+268
+T(mksp)−T(mksp)
+G= π π∗ (6)
+T(mksp)
+π∗
+whereT(mksp)istheoptimalmakespanorthebest-effortmakespan,fromamathematicaloptimization
+269 π∗
+tool,OR-Tools,servingasπ∗. Bythebest-effortmakespan,wemeanthemakespanderivedwitha
+270
+7
+
+--- PAGE 8 ---
+Table2: AveragemakespangapsforTAbenchmarks.
+Size 15×15 20×15 20×20 30×15 30×20 50×15 50×20 100×20 Avg.
+RS 0.148 0.165 0.169 0.144 0.177 0.067 0.100 0.026 0.125
+RS+op 0.143 0.193 0.159 0.192 0.213 0.123 0.126 0.050 0.150
+MWKR 0.191 0.233 0.218 0.239 0.251 0.168 0.179 0.083 0.195
+MOR 0.205 0.235 0.217 0.228 0.249 0.173 0.176 0.091 0.197
+SPT 0.258 0.328 0.277 0.352 0.344 0.241 0.255 0.144 0.275
+FIFO 0.239 0.314 0.273 0.311 0.311 0.206 0.239 0.135 0.254
+L2D 0.259 0.300 0.316 0.329 0.336 0.223 0.265 0.136 0.270
+Park 0.201 0.249 0.292 0.246 0.319 0.159 0.212 0.092 0.221
+SchN 0.152 0.194 0.172 0.190 0.237 0.138 0.135 0.066 0.161
+sufficientlylargetimelimitation,namelyhalfadaywithOR-Tools. Forcomparisoninexperiments,
+271
+weuseaserverwithIntelXeonE5-2683CPUandasingleNVIDIAGeForceGTX1080TiGPU.
+272
+OurmethodusesaCPUthreadandaGPUtotrainandevaluate,whileOR-Toolsuseseightthreads
+273
+tofindthesolution.
+274
+4.2 ExperimentsforJSP
+275
+ForJSP,wefirsttrainamodelbasedonresidualscheduling, namedRS.Forablationtesting, we
+276
+also train a model, named RS+op, by following the same training method but without removing
+277
+irrelevantoperations. Whenusingthesemodelstosolvetestinginstances,actionselectionisbased
+278
+onthegreedypolicythatsimplychoosestheaction(M,O)withthehighestscoredeterministically,
+279
+obtainedfromthescorenetworkasinFigure3(c).
+280
+Forcomparison,weconsiderthethreeDRLconstructionheuristics,respectivelydevelopedin(Zhang
+281
+etal.,2020)calledL2D,(Parketal.,2021b)byParketal.,and(Parketal.,2021a),calledScheduleNet.
+282
+Wedirectlyusetheperformanceresultsofthesemethodsforopenbenchmarksfromtheirarticles.
+283
+Forsimplicity,theyarenamedL2D,ParkandSchNrespectivelyinthispaper. Wealsoincludesome
+284
+constructionheuristicsbasedPDR,suchasMWKR,MOR,SPTandFIFO.Besides,toderivethe
+285
+gapstotheoptimuminallcases,OR-Toolsserveasπ∗asdescribedin(6).
+286
+Now,letusanalyzetheperformancesofRSasfollows. Table2showstheaveragemakespangaps
+287
+foreachcollectionofJSPTAbenchmarkswithsizes,15×15,20×15,20×20,30×15,30×20,50×15,
+288
+50×20and100×20,wherethebestperformances(thesmallestgaps)aremarkedinbold. Ingeneral,
+289
+RS performs the best, and generally outperforms the other methods for all collections by large
+290
+margins,exceptforthatithasslightlyhighergapsthanRS+opforthetwocollections,15×15and
+291
+20×20. Infact,RS+opalsogenerallyoutperformstherestofmethods,exceptforthatitisvery
+292
+closetoSchNfortwocollections. Fortheothersixopenbenchmarks,ABZ,FT,ORB,YN,SWV
+293
+andLA,theperformancesaresimilarandthuspresentedintheappendix. ItisconcludedthatRS
+294
+generallyperformsbetterthanotherconstructionheuristicsbylargemargins.
+295
+4.3 ExperimentsforFJSP
+296
+Table3: AveragemakespangapsforFJSPopenbenchmarks
+Method MK LA(rdata) LA(edata) LA(vdata)
+RS 0.232 0.099 0.146 0.031
+RS+op 0.254 0.113 0.168 0.029
+DRL-G 0.254 0.111 0.150 0.040
+MWKR 0.282 0.125 0.149 0.051
+MOR 0.296 0.147 0.179 0.061
+SPT 0.457 0.277 0.262 0.182
+FIFO 0.307 0.166 0.220 0.075
+ForFJSP,wealsotrainamodelbasedonresidualscheduling,namedRS,andaablationversion,
+297
+namedRS+op,withoutremovingirrelevantoperations.WecomparesourswithoneDRLconstruction
+298
+heuristicsdevelopedby(Songetal.,2023),calledDRL-G,andfourPDR-basedheuristics,MOR,
+299
+8
+
+--- PAGE 9 ---
+MWKR,SPTandFIFO.Wedirectlyusetheperformanceresultsofthesemethodsforopendatasets
+300
+accordingtothereportsfrom(Songetal.,2023).
+301
+Table3showstheaveragemakespangapsinthefouropenbenchmarks,MK,LA(rdata),LA(edata)
+302
+andLA(vdata). Fromthetable,RSgenerallyoutperformsalltheothermethodsforallbenchmarks
+303
+bylargemargins,exceptforthatRS+opisslightlybetterforthebenchmarkLA(vdata).
+304
+5 Discussions
+305
+Inthispaper,weproposeanewapproach,calledresidualscheduling,tosolvingJSPanFJSPproblems,
+306
+andtheexperimentsshowthatourapproachreachesSOTAamongDRL-basedconstructionheuristics
+307
+ontheaboveopenJSPandFJSPbenchmarks. Wefurtherdiscussesthreeissues: largeinstances,
+308
+computationtimesandfurtherimprovement.
+309
+Figure4: AveragemakespangapsofJSPinstanceswithdifferentproblemsizes.
+First,fromtheaboveexperimentsparticularlyforTAbenchmarkforJSP,weobservethattheaverage
+310
+gaps gets smaller as the number of jobs increases, even if we use the same model trained with
+311
+(N,M)=(10,10). Inordertoinvestigatesize-agnostics,wefurthergenerate13collectionsofJSP
+312
+instancesofsizesfortesting,from15×15to200×20,andgenerate10instancesforeachcollection
+313
+byusingtheprocedureabove. Figure4showstheaveragegapsforthesecollectionsforRSandL2D,
+314
+andthesecollectionsarelistedintheorderofsizesinthex-axis. Notethatweonlyshowtheresults
+315
+ofL2DinadditiontoourRS,sinceL2Distheonlyopen-sourceamongtheaboveDRLheuristics.
+316
+Interestingly,usingRS,theaveragegapsarenearlyzeroforthecollectionswithsizeslargerthan100
+317
+×15,namely,100×15,100×20,150×15,200×15and200×20. Amongthe50JSPinstances
+318
+inthefivecollections,49reacheszerogaps. AstrongimplicationisthatourRSapproachcanbe
+319
+scaledupforjobsizesandevenreachtheoptimalforsufficientlargejobcount.
+320
+Second,thecomputationtimesforRSarerelativelysmallandhaslowvariancelikemostofother
+321
+constructionheuristics. Here,wejustusethecollectionofTA100x20forillustration. Ittakesabout
+322
+30secondsonaverageforbothRSandRS+op,about28forL2Dandabout444forSchN.Incontrast,
+323
+ittakesabout4000secondswithhighvarianceforOR-tools. Thetimesforothercollectionsarelisted
+324
+inmoredetailintheappendix.
+325
+Table4: AveragemakespangapsforFJSPopenbenchmark.
+Method MK LA(rdata) LA(edata) LA(vdata)
+RS 0.232 0.099 0.146 0.031
+RS+100 0.154 0.047 0.079 0.007
+DRL-G 0.254 0.111 0.150 0.040
+DRL+100 0.190 0.058 0.082 0.014
+Third, as proposed by Song et al. (2023), construction heuristics can further improve the gap by
+326
+constructingmultiplesolutionsbasedonthesoftmaxpolicy,inadditiontothegreedypolicy. They
+327
+hadaversionconstructing100solutionsforFJSP,calledDRL+100inthispaper. Inthispaper,we
+328
+alsoimplementaRSversionforFJSPbasedonthesoftmaxpolicy,asdescribedinSubsection3.3,
+329
+andthenusetheversion,calledRS+100,toconstructing100solutions. InTable4,theexperimental
+330
+results show that RS+100 performs the best, much better than RS, DRL-G and DRL+100. An
+331
+importantpropertyforsuchanimprovementisthatconstructingmultiplesolutionscanbedonein
+332
+parallel. Thatis,forconstructionheuristics,thesolutionqualitycanbeimprovedbyaddingmore
+333
+computationpowers.
+334
+9
+
+--- PAGE 10 ---
+References
+335
+MajidAbdolrazzagh-NezhadandSalwaniAbdullah.2017. JobShopScheduling: Classification,Con-
+336
+straintsandObjectiveFunctions. InternationalJournalofComputerandInformationEngineering
+337
+11,4(2017),429–434.
+338
+JosephWilliamAdams,EgonBalas,andDanielJ.Zawack.1988. TheShiftingBottleneckProcedure
+339
+forJobShopScheduling. Managementscience34,3(1988),391–401.
+340
+DavidL.ApplegateandWilliamJ.Cook.1991. AComputationalStudyoftheJob-ShopScheduling
+341
+Problem.INFORMSJournalonComputing3,2(1991),149–156. https://doi.org/10.1287/
+342
+ijoc.3.2.149
+343
+PeterW.Battaglia, JessicaB.Hamrick, VictorBapst, AlvaroSanchez-Gonzalez, ViníciusFlores
+344
+Zambaldi,MateuszMalinowski,AndreaTacchetti,DavidRaposo,AdamSantoro,RyanFaulkner,
+345
+Çaglar Gülçehre, H. Francis Song, Andrew J. Ballard, Justin Gilmer, George E. Dahl, Ashish
+346
+Vaswani, KelseyR.Allen, CharlesNash, VictoriaLangston, ChrisDyer, NicolasHeess, Daan
+347
+Wierstra,PushmeetKohli,MatthewM.Botvinick,OriolVinyals,YujiaLi,andRazvanPascanu.
+348
+2018. Relational inductive biases, deep learning, and graph networks. CoRR abs/1806.01261
+349
+(2018). arXiv:1806.01261 http://arxiv.org/abs/1806.01261
+350
+DennisBehnkeandMartinJosefGeiger.2012. Testinstancesfortheflexiblejobshopscheduling
+351
+problemwithworkcenters. Arbeitspapier/ResearchPaper/Helmut-Schmidt-Universität,Lehrstuhl
+352
+fürBetriebswirtschaftslehre,insbes.Logistik-Management(2012).
+353
+PaoloBrandimarte.1993. Routingandschedulinginaflexiblejobshopbytabusearch. Ann.Oper.
+354
+Res.41,3(1993),157–183. https://doi.org/10.1007/BF02023073
+355
+IBM ILOG Cplex. 2009. V12. 1: User’s Manual for CPLEX. International Business Machines
+356
+Corporation46,53(2009),157.
+357
+Mauro Dell’Amico and Marco Trubian. 1993. Applying tabu search to the job-shop scheduling
+358
+problem. AnnalsofOperationsResearch41,3(1993),231–252. https://doi.org/10.1007/
+359
+BF02023076
+360
+AlhusseinFawzi,MatejBalog,AjaHuang,ThomasHubert,BernardinoRomera-Paredes,Moham-
+361
+madamin Barekatain, Alexander Novikov, Francisco J R Ruiz, Julian Schrittwieser, Grzegorz
+362
+Swirszcz, et al. 2022. Discovering faster matrix multiplication algorithms with reinforcement
+363
+learning. Nature610,7930(2022),47–53.
+364
+Matthias Fey and Jan Eric Lenssen. 2019. Fast Graph Representation Learning with PyTorch
+365
+Geometric, In ICLR Workshop on Representation Learning on Graphs and Manifolds. CoRR
+366
+abs/1903.02428. arXiv:1903.02428 http://arxiv.org/abs/1903.02428
+367
+M.R.GareyandDavidS.Johnson.1979. ComputersandIntractability: AGuidetotheTheoryof
+368
+NP-Completeness. W.H.Freeman,USA.
+369
+AmitKumarGuptaandAppaIyerSivakumar.2006.Jobshopschedulingtechniquesinsemiconductor
+370
+manufacturing. TheInternationalJournalofAdvancedManufacturingTechnology27,11(2006),
+371
+1163–1169.
+372
+ReinhardHaupt.1989. Asurveyofpriorityrule-basedscheduling. Operations-Research-Spektrum
+373
+11,1(1989),3–16.
+374
+JohannHurink,BerndJurisch,andMonikaThole.1994. Tabusearchforthejob-shopscheduling
+375
+problemwithmulti-purposemachines. Operations-Research-Spektrum15(1994),205–215.
+376
+SergeyIoffeandChristianSzegedy.2015.BatchNormalization:AcceleratingDeepNetworkTraining
+377
+byReducingInternalCovariateShift.InInternationalConferenceonMachineLearning(ICML)
+378
+(JMLRWorkshopandConferenceProceedings,Vol.37),FrancisR.BachandDavidM.Blei(Eds.).
+379
+JMLR.org,448–456. http://proceedings.mlr.press/v37/ioffe15.html
+380
+10
+
+--- PAGE 11 ---
+KlausJansen,MonaldoMastrolilli,andRobertoSolis-Oba.2000. ApproximationAlgorithmsfor
+381
+FlexibleJobShopProblems.InLatinAmericanSymposiumonTheoreticalInformatics(Lecture
+382
+NotesinComputerScience, Vol.1776), GastonH.Gonnet, DanielPanario, andAlfredoViola
+383
+(Eds.).Springer,68–77. https://doi.org/10.1007/10719839_7
+384
+BJLageweg,JKLenstra,andAHGRinnooyKan.1977.Job-shopschedulingbyimplicitenumeration.
+385
+ManagementScience24,4(1977),441–450.
+386
+StephenLawrence.1984. Resouceconstrainedprojectscheduling: Anexperimentalinvestigation
+387
+ofheuristicschedulingtechniques(Supplement). GraduateSchoolofIndustrialAdministration,
+388
+Carnegie-MellonUniversity(1984).
+389
+ZhigangLian,BinJiao,andXingshengGu.2006. Asimilarparticleswarmoptimizationalgorithm
+390
+forjob-shopschedulingtominimizemakespan. Appl.Math.Comput.183,2(2006),1008–1017.
+391
+https://doi.org/10.1016/j.amc.2006.05.168
+392
+Chun-ChengLin,Der-JiunnDeng,Yen-LingChih,andHsin-TingChiu.2019. SmartManufacturing
+393
+SchedulingWithEdgeComputingUsingMulticlassDeepQNetwork.IEEETrans.Ind.Informatics
+394
+15,7(2019),4276–4284. https://doi.org/10.1109/TII.2019.2908210
+395
+Min Liu, Zhi-jiang Sun, Junwei Yan, and Jing-song Kang. 2011. An adaptive annealing genetic
+396
+algorithmforthejob-shopplanningandschedulingproblem. ExpertSystemswithApplications38,
+397
+8(2011),9248–9255. https://doi.org/10.1016/j.eswa.2011.01.136
+398
+ShuLuo.2020. Dynamicschedulingforflexiblejobshopwithnewjobinsertionsbydeepreinforce-
+399
+ment learning. Applied Soft Computing 91 (2020), 106208. https://doi.org/10.1016/j.
+400
+asoc.2020.106208
+401
+Mingqi Lv, Zhaoxiong Hong, Ling Chen, Tieming Chen, Tiantian Zhu, and Shouling Ji. 2021.
+402
+TemporalMulti-GraphConvolutionalNetworkforTrafficFlowPrediction. IEEETransactions
+403
+onIntelligentTransportationSystems22,6(2021),3337–3348. https://doi.org/10.1109/
+404
+TITS.2020.2983763
+405
+AzaliaMirhoseini,AnnaGoldie,MustafaYazgan,JoeWenjieJiang,EbrahimM.Songhori,Shen
+406
+Wang,Young-JoonLee,EricJohnson,OmkarPathak,AzadeNazi,JiwooPak,AndyTong,Kavya
+407
+Srinivasa,WillHang,EmreTuncer,QuocV.Le,JamesLaudon,RichardHo,RogerCarpenter,and
+408
+JeffDean.2021. Agraphplacementmethodologyforfastchipdesign. Nature594,7862(2021),
+409
+207–212.
+410
+VolodymyrMnih,KorayKavukcuoglu,DavidSilver,AndreiA.Rusu,JoelVeness,MarcG.Belle-
+411
+mare, Alex Graves, Martin A. Riedmiller, Andreas Fidjeland, Georg Ostrovski, Stig Petersen,
+412
+CharlesBeattie,AmirSadik,IoannisAntonoglou,HelenKing,DharshanKumaran,DaanWierstra,
+413
+ShaneLegg,andDemisHassabis.2015. Human-levelcontrolthroughdeepreinforcementlearning.
+414
+Nature518,7540(2015),529–533. https://doi.org/10.1038/nature14236
+415
+J.F.MuthandG.L.Thompson.1963. IndustrialScheduling. Prentice-Hall.
+416
+In-BeomPark,JaeseokHuh,JoongkyunKim,andJonghunPark.2020. AReinforcementLearning
+417
+ApproachtoRobustSchedulingofSemiconductorManufacturingFacilities. IEEETransactionson
+418
+AutomationScienceandEngineering17,3(2020),1420–1431. https://doi.org/10.1109/
+419
+TASE.2019.2956762
+420
+JunyoungPark,SanjarBakhtiyar,andJinkyooPark.2021a. ScheduleNet: Learntosolvemulti-agent
+421
+schedulingproblemswithreinforcementlearning.CoRRabs/2106.03051(2021).arXiv:2106.03051
+422
+https://arxiv.org/abs/2106.03051
+423
+Junyoung Park, Jaehyeong Chun, Sang Hun Kim, Youngkook Kim, and Jinkyoo Park. 2021b.
+424
+Learningtoschedulejob-shopproblems: representationandpolicylearningusinggraphneural
+425
+networkandreinforcementlearning. InternationalJournalofProductionResearch59,11(2021),
+426
+3360–3377. https://doi.org/10.1080/00207543.2020.1870013
+427
+11
+
+--- PAGE 12 ---
+AdamPaszke,SamGross,FranciscoMassa,AdamLerer,JamesBradbury,GregoryChanan,Trevor
+428
+Killeen, ZemingLin, NataliaGimelshein, LucaAntiga, AlbanDesmaison, AndreasKöpf, Ed-
+429
+wardZ.Yang, ZacharyDeVito, MartinRaison, AlykhanTejani, SasankChilamkurthy, Benoit
+430
+Steiner,LuFang,JunjieBai,andSoumithChintala.2019. PyTorch: AnImperativeStyle,High-
+431
+Performance Deep Learning Library. In Neural Information Processing Systems (NeurIPS),
+432
+HannaM.Wallach,HugoLarochelle,AlinaBeygelzimer,Florenced’Alché-Buc,EmilyB.Fox,
+433
+andRomanGarnett(Eds.).8024–8035. https://proceedings.neurips.cc/paper/2019/
+434
+hash/bdbca288fee7f92f2bfa9f7012727740-Abstract.html
+435
+LaurentPerronandVincentFurnon.2019. OR-Tools. Google. https://developers.google.
+436
+com/optimization/
+437
+FerdinandoPezzella,GianlucaMorganti,andGiampieroCiaschetti.2008. Ageneticalgorithmfor
+438
+theFlexibleJob-shopSchedulingProblem. ComputersandOperationsResearch35,10(2008),
+439
+3202–3212. https://doi.org/10.1016/j.cor.2007.02.014
+440
+Qing-dao-er-jiRenandYupingWang.2012. Anewhybridgeneticalgorithmforjobshopscheduling
+441
+problem. ComputersandOperationsResearch39,10(2012),2291–2299. https://doi.org/
+442
+10.1016/j.cor.2011.12.005
+443
+MohammadSaidi-MehrabadandParvizFattahi.2007. Flexiblejobshopschedulingwithtabusearch
+444
+algorithms. The International Journal of Advanced Manufacturing Technology 32, 5 (2007),
+445
+563–570.
+446
+DavidSilver,AjaHuang,ChrisJ.Maddison,ArthurGuez,LaurentSifre,GeorgevandenDriess-
+447
+che,JulianSchrittwieser,IoannisAntonoglou,VedavyasPanneershelvam,MarcLanctot,Sander
+448
+Dieleman,DominikGrewe,JohnNham,NalKalchbrenner,IlyaSutskever,TimothyP.Lillicrap,
+449
+MadeleineLeach,KorayKavukcuoglu,ThoreGraepel,andDemisHassabis.2016. Mastering
+450
+thegameofGowithdeepneuralnetworksandtreesearch. Nature529,7587(2016),484–489.
+451
+https://doi.org/10.1038/nature16961
+452
+WenSong,XinyangChen,QiqiangLi,andZhiguangCao.2023. FlexibleJob-ShopSchedulingvia
+453
+GraphNeuralNetworkandDeepReinforcementLearning. IEEETrans.Ind.Informatics19,2
+454
+(2023),1600–1610. https://doi.org/10.1109/TII.2022.3189725
+455
+RobertH.Storer,S.DavidWu,andRenzoVaccari.1992.Newsearchspacesforsequencingproblems
+456
+withapplicationtojobshopscheduling. Managementscience38,10(1992),1495–1509.
+457
+RichardS.SuttonandAndrewG.Barto.2018. ReinforcementLearning: AnIntroduction(second
+458
+ed.). TheMITPress. http://incompleteideas.net/book/the-book-2nd.html
+459
+ÉricD.Taillard.1993. Benchmarksforbasicschedulingproblems. europeanjournalofoperational
+460
+research64,2(1993),278–285.
+461
+OriolVinyals,IgorBabuschkin,WojciechM.Czarnecki,MichaëlMathieu,AndrewDudzik,Junyoung
+462
+Chung,DavidH.Choi,RichardPowell,TimoEwalds,PetkoGeorgiev,JunhyukOh,DanHorgan,
+463
+Manuel Kroiss, Ivo Danihelka, Aja Huang, Laurent Sifre, Trevor Cai, John P. Agapiou, Max
+464
+Jaderberg,AlexanderSashaVezhnevets,RémiLeblond,TobiasPohlen,ValentinDalibard,David
+465
+Budden,YurySulsky,JamesMolloy,TomLePaine,ÇaglarGülçehre,ZiyuWang,TobiasPfaff,
+466
+YuhuaiWu,RomanRing,DaniYogatama,DarioWünsch,KatrinaMcKinney,OliverSmith,Tom
+467
+Schaul,TimothyP.Lillicrap,KorayKavukcuoglu,DemisHassabis,ChrisApps,andDavidSilver.
+468
+2019. GrandmasterlevelinStarCraftIIusingmulti-agentreinforcementlearning. Nature575,
+469
+7782(2019),350–354. https://doi.org/10.1038/s41586-019-1724-z
+470
+BerndWaschneck,ThomasAltenmüller,ThomasBauernhansl,andAndreasKyek.2016. Production
+471
+SchedulinginComplexJobShopsfromanIndustry4.0Perspective: AReviewandChallenges
+472
+in the Semiconductor Industry. In Proceedings of the 1st International Workshop on Science,
+473
+ApplicationandMethodsinIndustry4.0(i-KNOW)(CEURWorkshopProceedings,Vol.1793),
+474
+RomanKern,GeraldReiner,andOliviaBluder(Eds.).CEUR-WS.org. http://ceur-ws.org/
+475
+Vol-1793/paper3.pdf
+476
+KeyuluXu,WeihuaHu,JureLeskovec,andStefanieJegelka.2019. HowPowerfulareGraphNeural
+477
+Networks? (2019). https://openreview.net/forum?id=ryGs6iA5Km
+478
+12
+
+--- PAGE 13 ---
+TakeshiYamadaandRyoheiNakano.1992. AGeneticAlgorithmApplicabletoLarge-ScaleJob-
+479
+Shop Problems. In Parallel Problem Solving from Nature 2, (PPSN-II), Reinhard Männer and
+480
+BernardManderick(Eds.).Elsevier,283–292.
+481
+CongZhang,WenSong,ZhiguangCao,JieZhang,PuaySiewTan,andChiXu.2020. Learning
+482
+toDispatchforJobShopSchedulingviaDeepReinforcementLearning.InNeuralInformation
+483
+ProcessingSystems(NeurIPS),HugoLarochelle, Marc’AurelioRanzato, RaiaHadsell, Maria-
+484
+Florina Balcan, and Hsuan-Tien Lin (Eds.). https://proceedings.neurips.cc/paper/
+485
+2020/hash/11958dfee29b6709f48a9ba0387a2431-Abstract.html
+486
+CongZhang,WenSong,ZhiguangCao,JieZhang,PuaySiewTan,andChiXu.2022. Learningto
+487
+SearchforJobShopSchedulingviaDeepReinforcementLearning. CoRRabs/2211.10936(2022).
+488
+https://doi.org/10.48550/arXiv.2211.10936arXiv:2211.10936
+489
+CongZhang,YaoxinWu,YiningMa,WenSong,ZhangLe,ZhiguangCao,andJieZhang.2023. A
+490
+reviewonlearningtosolvecombinatorialoptimisationproblemsinmanufacturing. IETCollabora-
+491
+tiveIntelligentManufacturing5,1(2023),e12072. https://doi.org/10.1049/cim2.12072
+492
+arXiv:https://ietresearch.onlinelibrary.wiley.com/doi/pdf/10.1049/cim2.12072
+493
+JieZhou,GanquCui,ShengdingHu,ZhengyanZhang,ChengYang,ZhiyuanLiu,LifengWang,
+494
+Changcheng Li, and Maosong Sun. 2020. Graph neural networks: A review of methods and
+495
+applications.AIOpen1(2020),57–81. https://doi.org/10.1016/j.aiopen.2021.01.001
+496
+13

@@ -1,0 +1,1721 @@
+
+--- PAGE 1 ---
+PublishedasaconferencepaperatICLR2026
+RESCHED: RETHINKING FLEXIBLE JOB SHOP
+SCHEDULING FROM A TRANSFORMER-BASED
+ARCHITECTURE WITH SIMPLIFIED STATES
+XiangjieXiao1,CongZhang2,WenSong3,ZhiguangCao1∗
+1SchoolofComputingandInformationSystems,SingaporeManagementUniversity,Singapore
+2CollegeofComputingandDataScience,NanyangTechnologicalUniversity,Singapore
+3InstituteofMarineScienceandTechnology,ShandongUniversity,China
+xj.xiao.2024@phdcs.smu.edu.sg, cong.zhang92@gmail.com,
+wensong@email.sdu.edu.cn, zgcao@smu.edu.sg
+ABSTRACT
+Neural approaches to the Flexible Job Shop Scheduling Problem (FJSP), partic-
+ularly those based on deep reinforcement learning (DRL), have gained growing
+attention in recent years. However, existing methods rely on complex feature-
+engineered state representations (i.e., often requiring more than 20 handcrafted
+features) and graph-biased neural architectures. To reduce modeling complexity
+andadvanceamoregeneralizableframeworkforFJSP,weintroduce RESCHED,
+a minimalist DRL framework that rethinks both the scheduling formulation and
+model design. First, by revisiting the Markov Decision Process (MDP) formu-
+lation of FJSP, we condense the state space to just four essential features, elimi-
+natinghistoricaldependenciesthroughasubproblem-basedperspective. Second,
+we employ Transformer blocks with dot-product attention, augmented by three
+lightweight but effective architectural modifications tailored to scheduling tasks.
+Extensive experiments show that RESCHED outperforms classical dispatching
+rulesandstate-of-the-artDRLmethodsonFJSP.Moreover,RESCHEDalsogener-
+alizeswelltotheJobShopSchedulingProblem(JSSP)andtheFlexibleFlowShop
+Scheduling Problem (FFSP), achieving competitive performance against neural
+baselinesspecificallydesignedforthesevariants.
+1 INTRODUCTION
+The Flexible Job Shop Scheduling Problem (FJSP) is a fundamental combinatorial optimization
+problem (COP) with widespread applications in manufacturing (Ding et al., 2019; Wang et al.,
+2024a),edgecomputing(Luoetal.,2021;Yangetal.,2025),andlogistics(SAT,2014;Arunarani
+etal.,2019).InFJSP,jobsaredecomposedintosequencesofoperations,eachprocessablebyasetof
+compatiblemachines.SolvingFJSPentailstwocoupleddecisions:assigningoperationstomachines
+andsequencingthemoneachmachine. Asagenericmodel,FJSPunifiesmultipleschedulingsce-
+narios: itreducestotheJobShopSchedulingProblem(JSSP)whenmachineassignmentsarefixed,
+and to the Flexible Flow Shop Scheduling Problem (FFSP) when jobs follow a shared processing
+stage but retain machine flexibility. This inherent generality makes FJSP a critical framework for
+diversereal-worldsystems.
+RecentresearchhasleveragedDeepReinforcementLearning(DRL)toconstructschedulingheuris-
+tics(Fengetal.,2021;Leietal.,2022),typicallyrepresentingpartialsolutions(states)viadisjunc-
+tivegraphs(Błaz˙ewiczetal.,2000)enrichedwithcomplexnodefeatures. However,manyofthese
+featuresareredundant1,andincorporatinghistoricalconstructiondataintothecurrentstatecanpara-
+doxicallydegradelearning(seeSection4.1.2). Furthermore,pruningunpromisingactionsbasedon
+humanheuristics(Songetal.,2023;Wangetal.,2024b;Zhaoetal.,2025),whileintendedtoboost
+∗Correspondingauthor.
+1Forinstance,wedemonstrateinAppendixB.3usingDANIEL(Wangetal.,2024b)thatremovinghalfof
+theinputfeaturesdoesnotcompromiseperformance.
+1
+
+--- PAGE 2 ---
+PublishedasaconferencepaperatICLR2026
+efficiency,oftenhamperspolicygeneralizationandyieldssuboptimalsolutions(seeAppendixB.3).
+Thesepracticesnecessitatepersistenttrackingofauxiliaryvariablesateverystep, introducingsig-
+nificant computational overhead. Architecturally, most DRL approaches rely on Graph Attention
+Networks (GATs) (Velickovic et al., 2017), which impose rigid inductive biases: capturing long-
+range dependencies requires deep stacking, while linear attention mechanisms struggle to model
+complexnon-localschedulinginteractions. Theselimitationspromptacentralquestion:Canwede-
+signageneralconstructionpolicy,derivedfromaminimalMarkov-sufficientstateandimplemented
+withagenericyetexpressivearchitecture,thatgeneralizesnaturallytoFJSPvariants?
+We address this by proposing RESCHED, a DRL framework that unifies minimalist state design
+withflexibleneuralmodelingtoachievestate-of-the-art(SOTA)performance. Wedemonstratethat
+ensuringstatesufficiencyreducestheneedforheavyarchitecturalinductivebias. Ourformulation
+introducesacompactstaterepresentationcomprisingonlyfourcorenodefeaturesandagraphstruc-
+turethatexplicitlyencodesintra-jobdependencies,therebyeliminatingtheneedforhistoricaltrack-
+ing.Toenhancerepresentationalpower,wereplaceconventionalGNN-basedpolicies(Francoetal.,
+2009)withaTransformerbackbonefeaturingtwocomplementarybranches:self-attentionforopera-
+tionsandcross-attentionformachines.ApplyingTransformerstoFJSPpresentsspecificchallenges:
+self-attentionmustcaptureprocessconstraintswithoutextraparameters,whilecross-attentionmust
+handle indirect edge-feature integration and severe operation-machine imbalance (often exceeding
+10:1). We overcome these by incorporating Rotary Positional Encoding (RoPE) for intra-job se-
+quencinganddetermininganovelcross-attentionmodulethatdirectlyembedsedgefeatureswhile
+using self-connections to mitigate representation dilution. Empirical results show that RESCHED
+establishesanewSOTAonFJSP,outperformingbothhandcraftedheuristicsandleadingDRLbase-
+lines. Crucially, it generalizes robustly across problem sizes, datasets, and variants (JSSP, FFSP),
+provingthataminimalistdesigncoupledwithexpressivemodelingenablesbroadapplicability. Our
+keycontributionsare:
+• WerevisittheMDPforFJSPtodesignacompactstaterepresentationwithonlyfouressen-
+tialnodefeatures. Byutilizingagraphstructurethatexplicitlyencodesintra-jobrelation-
+ships,weeliminateredundantfeatures,historicaldependencies,andauxiliaryvariables.
+• We introduce a dual-branch Transformer architecture tailored for scheduling. It features
+self-attention enhanced by RoPE to model intra-job dependencies, and a novel cross-
+attentionmodulethatdirectlyintegratesedgefeatureswhilemitigatingoperation–machine
+imbalancethroughself-connections.
+• We demonstrate that RESCHED achieves SOTA performance on FJSP benchmarks while
+exhibiting strong generalization capabilities across varying problem sizes and scheduling
+variants,includingJSSPandFFSP.
+2 RELATED WORK
+Priority dispatching rules (PDRs) (Haupt, 1989; Sels et al., 2012) are widely used in real-world
+FJSPsfortheirsimplicity,interpretability,andfastdecision-making. However,designingeffective
+andgeneralizablePDRsremainschallenging,astheyoftenrelyondomainexpertiseandfailtoadapt
+acrossdiverseprobleminstances. ThislimitationhasmotivatedasurgeofinterestinlearningPDRs
+through deep reinforcement learning (DRL). Most DRL-based methods formulate FJSP as a dis-
+junctivegraph,wherenodesrepresentoperationsandmachines,andedgesencodeprecedenceand
+assignmentconstraints. Graphneuralnetworks(GNNs)arethenemployedtocapturethecomplex
+relationshipsamongoperationsandmachines. Forexample,Songetal.(2023)proposedHGNN,a
+heterogeneousGNNtailoredforFJSP;Wangetal.(2024b)introducedadual-attentionmechanism
+to jointly model operation and machine features; and Zhao et al. (2025) developed a GNN-based
+approach augmented with reward shaping to improve training efficiency. While effective, these
+methods typically depend on heavily engineered state representations, which limit scalability and
+generalization. BeyondFJSP,DRLhasalsobeenappliedtootherschedulingvariants. Forinstance,
+Zhang et al. (2020) proposed a GNN-based DRL framework for JSSP that learns operation se-
+quencingpolicies,andKwonetal.(2021)introducedamixed-scoreattentionmechanismtomodel
+operation–machine interactions in FFSP. These works further highlight the growing role of neural
+methodsinadvancingdata-drivenscheduling.
+2
+
+--- PAGE 3 ---
+PublishedasaconferencepaperatICLR2026
+3 PRELIMINARY
+3.1 FLEXIBLEJOBSHOPSCHEDULINGPROBLEM(FJSP)
+Consideragenericschedulingproblemwithoperationsasfundamentalunits.Supposetherearetwo
+sets: asetofoperationsO = {O ,O ,...,O }andasetofmachinesM = {M ,M ,...,M }.
+1 2 n 1 2 m
+EachoperationO canbeprocessedbyoneofthemachinesinMwithaspecificduration(process-
+i
+ingtime)Dm > 0. InFJSP,jobsarecollectionsofoperationsthatmustbeexecutedsequentially.
+i
+EachjobJ consistsofseveraloperations,sooperationscanberepresentedasO ,whereidenotes
+i ij
+the job index and j represents the position of the operation in job i. Each operation O can be
+ij
+processed by one or multiple machines, which means ”flexible”, from a compatible machine set
+M ⊆MwithdurationDm >0. Meanwhile,theFJSPissubjecttoseveralimportantconstraints:
+ij ij
+(1) An operation can only begin after all its preceding operations in the job sequence have been
+completed. (2) Each operation must be assigned to a single eligible machine and executed non-
+preemptively,withoutinterruptiononcestarted. (3)Eachmachineprocessesonlyoneoperationat
+a time, requiring sequential execution without overlap. The objective of FJSP is to find a feasible
+solutionthatsatisfiesalltheaboveconstraintswhileminimizingtheoverallmakespan,whichisde-
+fined as the maximum finish time among all operations. Moreover, the transformation of FJSP to
+othervariantslikeJSSPandFFSParepresentedinAppendixA.2.
+3.2 TRANSFORMERBLOCK
+The Transformer block (Vaswani et al., 2017) is a fundamental component designed to capture
+dependenciesinsequentialdata. Itprimarilyconsistsofamulti-headattention(MHA)mechanism
+andafeed-forwardnetwork(FFN),combinedwithresidualconnectionsandlayernormalization(He
+etal.,2016;Baetal.,2016). Intheattentionmechanism,eachelementattendstoallothersthrough
+aweightedcombinationoftheirrepresentations. Foragiveninputsequenceh = [h ,h ,...,h ],
+1 2 n
+theattentionweightsarecomputedbymeasuringthesimilaritybetweenaqueryq ∈ Rd andkeys
+a
+k ∈ Rd, typicallyobtainedvialearnedlinearprojectionsofh andh . Thenormalizedattention
+b a b
+weight α from node a to node b, and the resulting embedding h′ for node a are computed as
+a,b a
+follows(headisomittedforbrevity):
+(cid:18) (cid:19) n
+α =softmax ⟨q a√ ,k b ⟩ , h′ = (cid:88) α v , (1)
+a,b b a a,b b
+d
+b=1
+√
+where ⟨·,·⟩ denotes the dot product, d is a scaling factor to stabilize training, and v ∈ Rd is
+b
+the value vector corresponding to node b. The outputs from multiple heads are concatenated and
+passedthroughalineartransformationtoformthefinalMHAoutput,whichisthenprocessedbya
+position-wiseFFN,withresidualconnectionsandlayernormalizationappliedafterboththeatten-
+tionandFFNsub-layers. ThisstructureallowstheTransformerblocktoeffectivelycaptureglobal
+dependenciesandcomplexinteractionsamongelementsintheinput.
+4 METHODOLOGY
+In this section, we introduce ReSched, a construction-type neural framework designed for solving
+schedulingproblems. Webeginbyrevisitingtheproblemformulation,focusingontheFlexibleJob
+ShopSchedulingProblem(FJSP),ageneralizedmodelthatcapturesdiverseschedulingscenarios.
+Within this formulation, we cast scheduling as a Markov Decision Process (MDP), where each
+decisionstepresolvesasubproblemusingacompact,task-specificstaterepresentation. Buildingon
+thisMDP,wedevelopaTransformer-basedpolicynetworkequippedwithstructure-awareattention
+mechanismsandtrainedviareinforcementlearning.
+4.1 STATEREPRESENTATION
+Inourframework,weaimtominimizethecomplexityofthestaterepresentationwhileensuringit
+remainsfullyexpressiveandsufficienttoguideoptimalschedulingdecisions.
+3
+
+--- PAGE 4 ---
+PublishedasaconferencepaperatICLR2026
+Solution1
+2,  1,  2,  1  
+12
+
+22
+and  
+32
+
+42
+Ins  ta 1 n 1 c,e  12,  21,  22  11  11   1   1   1   1
+1112 2 3  12  12  12  22
+4  41  121    11
+
+122   12
+21  22  11  1    2  12  12  22 Solution2
+21  21  21  21Makespan2 = 6
+2,  1,  2,  2
+11,  21,  12,  22
+)tnemnorivnE(
+noitalumroF
+PSJF
+Makespan1 = 7
+
+11
+and  
+21
+
+31
+and  
+41
+(a)
+krtowteN
+Select
+-- pair
+on first step State State
+Input
+State
+(b)
+Figure 1: (a) Illustration of the formulation for a 2-job, 2-operation, 2-machine (2-2-2) FJSP in-
+stance. (b)ChangesintopologyandO2M/O2OConnectionbetweentwostepsfora3-3-3instance.
+4.1.1 REVISITINGTHESCHEDULINGFORMULATION
+WerepresentanFJSPinstanceusingaheterogeneousdisjunctivegraph(Songetal.,2023),asillus-
+tratedinFigure1a. AsolutiontoFJSPconsistsoftwokeycomponents: assignmentandorder. To
+evaluatesolutionquality,anexplicitformulationisrequiredtocomputethemakespan.
+Letam ∈{0,1}indicateassignmentofO tomachinematstept. Toensureonlyoneoperation-
+t,ij ij
+machinepairisscheduledperstep,weenforceaconstraint: (cid:80) (cid:80) am = 1,∀t.When
+m∈M (ij)∈O t,ij
+am =1,thefinishtimeFT iscomputedas:
+t,ij ij
+FT =max (cid:0) FT ,ATm(cid:1) +Dm, ifam =1,
+ij i(j−1) t ij t,ij
+(cid:26) FT ifam =1 (2)
+ATm = i′j′ t−1,i′j′
+t ATm otherwise.
+t−1
+Here, FT denotes the finish time of the preceding operation in job J , ATm is the available
+i(j−1) i t
+time of machine m at step t, and (i′j′) is the operation assigned to machine m at the previous
+step. The goal of FJSP is to minimize the maximum finish time across all operations, which is
+defined as FT = max FT . This unified formulation supports our state representation
+max (ij)∈O ij
+simplification, and it can also be adapted to JSSP and FFSP by appropriately modifying machine
+assignment rules. For the sake of space, the detailed mathematical formulation of FJSP and its
+variantsaredeferredtoAppendixA.1.
+Looking at Figure 1a again, it illustrates how two different solutions for the same FJSP instance
+aretranslated,viatheaboveformulation,intoconcreteGanttchartsandmakespanvalues. Specifi-
+cally,thetopsolutionwithorder[O ,O ,O ,O ]andassignment[M ,M ,M ,M ]resultsin
+11 12 21 22 2 1 2 1
+amakespanofFT = 7,whilethebottomsolutionwithorder[O ,O ,O ,O ]andassign-
+max 11 21 12 22
+ment[M ,M ,M ,M ]achievesamakespanofFT =6.
+2 1 2 2 max
+4.1.2 MDPFORMULATION
+As a construction method, the scheduling process can be viewed as a sequential decision-making
+problem,wheretheagentiterativelyselectsanoperation-machinepairtoassignateachstep. This
+leadstoanaturalformulationoftheschedulingproblemasanMDP.
+State: Minimal Representation According to Eq. (2), computing the finish time for operation
+O at step t requires three pieces of information: (1) the finish time of its predecessor O ,
+ij i(j−1)
+(2) the Duration Dm of O on machine M , and (3) the available time ATm of machine M .
+ij ij m t m
+Particularly,“predecessor”denotestheprecedenceconstraintbetweenoperations:anoperationmay
+start only after all of its predecessors have finished; we refer to this as the operation-to-operation
+(O2O)dependency. Meanwhile,theMachineAvailableTimeATm isdeterminedbythefinishtime
+t
+oftheoperationassignedtomachineM attheprevioussteps. Therefore,theATm isinfluenced
+m t
+bytheoperation-to-machine(O2M)connection. Fromaconsistencyperspective,thefinishtimeof
+O canalsobeinterpretedastheOperationAvailableTimeforitssuccessorO .
+i(j−1) ij
+4
+
+--- PAGE 5 ---
+PublishedasaconferencepaperatICLR2026
+Thus,thetransitionfromstept−1totrequiresonlythefollowinginformation: 1)Operationand
+Machine Available Time (Node feature); 2) Duration (Edge feature); 3) O2O Dependency (Graph
+structure);4)O2MConnection(Graphstructure).
+Definition4.1. LetS ∈Sbethestaterepresentationatdecisionstept,whichuniquelydetermines
+t
+the following: 1) the available times of all machines, 2) the completion status of all jobs (i.e., the
+finishtimesoftheirmostrecentlyscheduledoperations),3)theO2Oprecedencebetweenoperations,
+and4)theO2Mconnections(includingthecorrespondingdurations).
+Proposition1(State-dependentOptimalityinScheduling). Foranytwoschedulingtrajectoriesτ
+1
+and τ that reach the same state S , the corresponding remaining subproblems share an identical
+2 t
+feasiblesolutionset.
+Asadirectconsequence, theoptimaldecisionatsteptdependsonlyonS , ratherthanonthefull
+t
+trajectoryhistory. Withthisstatedefinition,theschedulingproblemcanbeviewedasafinite-state
+MDPthatsatisfiestheMarkovproperty.AformalproofofProposition1isprovidedinAppendixD.
+State: Subproblem Inourframework,eachschedulingstepismodeledasanindividualsubprob-
+lem. To better support this formulation, we refine the state representation along two dimensions:
+availabletimefromnodefeaturesandO2Odependenciesfromgraphstructure,therebyexcluding
+historicalinformationandfocusingsolelyonthecurrentsubproblem. 1)RelativeAvailableTime.
+Wenormalizealloperationandmachineavailabletimesbysubtractingtheglobalminimumavail-
+able time at each step. This prevents the unbounded growth of absolute time values and mitigates
+potential generalization issues. A conceptually related idea of removing historical dependencies
+and using relative-time features for JSSP was explored by Lee & Kim (2024); Unlike this JSSP-
+specific design, we remove all historical information under a subproblem-based formulation and
+extendtherelative-timeprincipletoaunifiedminimalstateforFJSPanditsvariants. 2)O2OCon-
+nection. Instead of the bidirectional operation-to-operation (O2O) edges commonly used in prior
+work(Songetal.,2023;Wangetal.,2024b;Zhaoetal.,2025),weadoptbackward-lookingedges.
+Under the subproblem formulation, each operation only requires information from its successors,
+makingredundanthistoricaltrackingunnecessary. Tofurtherimproveefficiency,weintroducehop
+connectionsfromeachoperationtoallitssuccessors,grantingdirectaccesstojob-levelfuturecon-
+straints without relying on multi-layer message passing. Figure 1b illustrates how graph topology
+andO2O/O2Mconnectionsevolve: onceanoperationisscheduled,itanditsassociatedO2O/O2M
+connectionsareremoved,yieldinganewsubproblem.
+RegardingthenodefeaturementionedinMinimalRepresentation,wealsoincorporatetheMinimum
+Durationmin Dmacrosscandidatemachinesasacompactyetinformativeproxy. Thisvalue
+m∈Mij ij
+providesalowerboundonprocessingtime,enablingthenetworktodistinguishoperationsofvarying
+difficulty. Although it depends on the set of candidate machines and may be sensitive to instance
+variations, prior work (Song et al., 2023; Lei et al., 2022; Wang et al., 2024b; Zhao et al., 2025)
+showsthatitisasimpleandeffectiveapproximationinpractice. Inourframework,itsignificantly
+improveslearningefficiencywithoutrequiringexplicitmachineassignments.
+State: Features Our state representation consists of four key features: 1) Operation Available
+Time; 2)MachineAvailableTime; 3)Duration; and4)MinimumDuration. Notethatdependency
+andmachineeligibilityarenotfeaturesbutgraphstructure,representedbyO2O/O2Mconnections.
+Action In our MDP formulation, the action at step t corresponds to selecting an opera-
+tion–machine pair (ij,m), meaning that operation O is assigned to machine M . For simplic-
+ij m
+ity,wedenotethisactionasa ,andthecompletescheduleisrepresentedasasequenceofactions:
+t
+A = {a ,··· ,a ,··· ,a },wherenisthetotalnumberofschedulingsteps(i.e.,thetotalnumber
+1 t n
+ofoperations). IncontrasttomanyexistingneuralapproachesforFJSP,whichintroduceauxiliary
+notionssuchasfreetimeorcurrenttimetoprunetheactionspaceateachstep(Songetal.,2023;
+Wangetal.,2024b;Zhaoetal.,2025), ourframeworkavoidssuchheuristicconstraints. Theonly
+restrictionweimposeisthenaturalprecedenceconstraintbetweenoperations(Zhangetal.,2020).
+Transition After taking action a , the environment transitions deterministically to a new state
+t
+s , fully determined by the current state s and action a . Specifically, operation and machine
+t+1 t t
+statusareupdatedaccordingtoEq.(2).
+5
+
+--- PAGE 6 ---
+PublishedasaconferencepaperatICLR2026
+ReSched Edge in
+Attention
+O wi p th e r R a e tio la n ti v & e M A a v c a h ila in b e le Time Edge + O2M Mask
+M (N a o c d h e in ) e Learnable +
++
+D (E u d r g a e tio ) n Non-Learnable Edge
+O (N p o e d r e a ) tion R C e o s n i n d e u c a t l A E t d te g n e t i i o n n Residual Probability Select Output
+Machine Branch with Block
+（C O o 2 n M n e M ct a io sk n） 1 3 4 6 8 Self-based Cross Attention
+3 9 2 6 2 3 4
+2 5 9 7 6
+Residual
+（C O o 2 n O n e M ct a io sk n） ··· ··· Minimum ··· ··· Block Edge MLP
+2 5 2 3 4 2 3 7 4 Operation Branch Action Space
+O2O Mask with RoPE
+State Feature Extraction Decision-Making
+Figure 2: The RESCHED framework. The state consists of four information, resulting in four key
+features(availabletimeandminimumdurationforoperation;availabletimeformachine;duration),
+andincorporatesthree(underlined)architecturalenhancementsforTransformer-basednetwork. For
+decision-makingmodule,weconcatenatetheembeddingsofeachfeasibleoperation–machinepair,
+feedthemintoanMLPtoobtainascore.
+Reward Inspired by Zhang et al. (2020), we use an estimated lower-bound makespan as the re-
+ward2. Before the scheduling process begins, the lower-bound finish time for each operation can
+becomputediterativelyas: FT =FT +min Dm,andFT =max FT ,
+ij i(j−1) m∈Mij ij max (ij)∈O ij
+where FT denotes the lower-bound finish time of operation O , and FT represents the es-
+ij ij max
+timated lower-bound makespan. During the scheduling process, we compute the estimated lower-
+boundfinishtimeFT (s )basedonthecurrentstates . Therewardatsteptisdefinedasthe
+max t t
+negativedifferencebetweentheestimatedlower-boundmakespanbeforeandaftertheaction:
+r =−(FT (s )−FT (s )). (3)
+t max t+1 max t
+4.2 POLICYNETWORKARCHITECTURE
+Wedesignadecoder-onlyneuralarchitecture(Drakulicetal.,2023)tosolveschedulingproblems,
+consisting of two main modules: a feature extraction network that models structural and tempo-
+ralinformationintoembeddings,andalightweightMLP-basedpolicyheadthatmakesscheduling
+decisions. TheoverallarchitectureisillustratedinFigure2.
+4.2.1 FEATUREEXTRACTIONNETWORK
+Toeffectivelyrepresentbothstructuralandtemporalaspectsoftheschedulingproblem,wedesign
+afeatureextractionnetworkcomposedoftwobranches. TheoperationbranchmodelsO2Odepen-
+denciesviaself-attention, whilethemachinebranchisbuiltaroundcross-attentionthataggregates
+operationinformationintomachineembeddings.BothbranchesarebuiltuponstandardTransformer
+layers,withseveraltargetedadaptationstobettercapturetheuniqueschedulingcharacteristics.
+OperationbranchwithRoPE Intheabsenceofexplicitpositionalencoding,intra-joborder(i.e.,
+O2O dependency) must be inferred implicitly across network layers, which is both inefficient and
+unreliable. Toaddressthis, weincorporateRotaryPositionalEmbedding(RoPE)(Suetal.,2024)
+intotheoperationbranchtodirectlymodelrelativeintra-jobdistanceswithoutintroducingadditional
+learnable parameters, as shown in the middle bottom of Figure 2. Particularly, RoPE makes the
+similaritybetweenqueryq andkeyk afunctiongnotonlyoftheircontentembeddingsx andx ,
+a b a b
+butalsooftheirrelativepositiona−b:
+⟨RoPE (x ,a),RoPE (x ,b)⟩=g(x ,x ,a−b). (4)
+q a k b a b
+2InAppendixF,wefurthercomparethisestimatedlower-boundrewardwithtwoalternatives(estimated-
+meanand∆-makespanrewards).
+6
+
+--- PAGE 7 ---
+PublishedasaconferencepaperatICLR2026
+In scheduling, dependencies arise only within individual jobs. Operations from different jobs or
+machines can be permuted arbitrarily without affecting decision-making, rendering their relative
+positionsirrelevant.Inthissense,RoPEisexclusivelyappliedwithintheoperationbranch,injecting
+positionalawarenessintointra-jobattentionpatterns. Unlikeindex-basedpositionalfeatures,RoPE
+hasbeenshowntoprovidestrongergeneralizationandbetterstructuralencoding. Thisallowsusto
+simplifythefeaturesetwhilestillpreservingtheessentialsequentialinformationatthejoblevel.
+Machine branch with Edge in Attention The machine branch is designed to capture the struc-
+turalinteractionsbetweenoperationsandmachines.Akeyaspectofthisinteractionistheprocessing
+duration, whichisnaturallydefinedonedgesratherthanbelongingtoeitheroperationormachine
+nodes. Tomodelthis,weemployacross-attentionmechanisminwhicheachoperationattendstoall
+ofitscandidatemachines,incorporatingbothnode-levelandedge-levelinformation. Thisdesignis
+illustratedinFigure2(upperbranchoftheFeatureExtractionmodule).
+Unlikepriorcross-attentionapproaches(Kwonetal.,2021;Drakulicetal.,2024),whichincorporate
+edgefeaturesindirectlybyadjustingattentionscores,ourdesignintegratesedgeinformationdirectly
+by embedding it into the value vectors. This ensures that edge attributes influence not only the
+attentionweightsbutalsothefinalaggregatedrepresentations. Formally,foranoperationnodeO
+ij
+andamachinenodeM ,theattentioniscomputedas:
+m
+(cid:18) (q +q )⊤(k +k ) (cid:19)
+Attention(M ,O )=σ m m,ij√ ij m,ij ·(v +v ), (5)
+m ij ij m,ij
+d
+whereσ denotesthesoftmaxfunction,q isthequeryfromthemachinenode,k andv arethe
+m ij ij
+keyandvaluefromtheoperationnode,andq ,k ,v areedge-specificprojectionsderived
+m,ij m,ij m,ij
+fromthedurationDm.Sincethenumberofoperation–machinepairsscaleswith|O|×|M|,learning
+ij
+independentprojectionparametersforeachedgewouldbecomputationallyprohibitive.Tomaintain
+efficiency, we share projection weights across all attention heads as well as across the query, key,
+andvalueprojections,significantlyreducingparametercountandmemoryusage.
+MachinebranchwithSelf-basedCross-attention Inschedulingproblems,thenumberofoper-
+ationsoftenexceedsthenumberofmachinesbyanorderofmagnitude. Thisstructuralasymmetry
+leadstoasevereinformationimbalance: eachmachinemustaggregateinformationfromadispro-
+portionately large number of operations, i.e., often 10 times or more, which dilutes attention sig-
+nalsanddestabilizestraining. Inspiredbythemachine-nodeembeddingaggregationinSongetal.
+(2023),weintroduceaself-basedcross-attentionmechanism,whereeachmachinenodealsoattends
+toitsownrepresentationduringattentionweightcomputation(i.e.,upperbranchoftheFeatureEx-
+traction module in Figure 2). While residual connections inject self-information unconditionally
+after attention, the self-based formulation enables the model to assign a soft, adaptive attention
+weighttothemachine’sownembedding. Thishelpspreservecriticalmachine-levelinformationin
+the presence of overwhelming inter-node messages. Formally, for a machine node M with pro-
+m
+jectedvaluevectorv andoperationprojectedvaluevectorsv ∈ Rd, theattentionoutputh′ is
+m ij m
+definedas:
+(cid:88)
+h′ =α v + α v , (6)
+m mm m ij ij
+(ij)∈N(Mm)
+whereα istheattentionweightassignedtothemachinenodeitself,α aretheattentionweights
+mm ij
+for operation nodes connected to M , and N(M ) denotes the set of such operation nodes. To
+m m
+reduceparameters,wesharethequery,key,andvalueprojectionweightsacrossmachinenodes.
+4.2.2 DECISION-MAKING
+Ourdecision-makingmodulefollowsastandardpolicynetworkdesignadoptedinpriorDRL-based
+scheduling works (Song et al., 2023; Wang et al., 2024b; Zhao et al., 2025) based on operation-
+machine pairs. It consists of a multi-layer perceptron (MLP) that takes as input the operation and
+machine embeddingsfrom the feature extractionnetwork, along with theedge (i.e., duration) em-
+beddings, and produces a scalar score for each feasible operation–machine pair. A softmax over
+these scores yields the final probability distribution. Notably, for simplicity, we do not include a
+globalembeddingindecision-making,asitshowslimitedeffectiveness3. Additionally,asdiscussed
+3WedemonstrateinAppendixB.3,usingDANIEL(Wangetal.,2024b)asanexample,thatremovingits
+globalembeddingdoesnotdegradeperformance.
+7
+
+--- PAGE 8 ---
+PublishedasaconferencepaperatICLR2026
+inSection4.1.2,wedonotincorporateheuristicmaskingtoprunetheactionspacebeyondthehard
+schedulingconstraints(i.e.,O2Odependency/O2Mconnection).
+However,unlikemostpriorworks(Zhangetal.,2020;Songetal.,2023;Wangetal.,2024b;Zhao
+etal.,2025)thatadoptactor-criticframeworkssuchasProximalPolicyOptimization(PPO)(Schul-
+man et al., 2017), we leverage a simple REINFORCE algorithm (Williams, 1992) to optimize the
+policy. AlthoughvanillaREINFORCEisknowntoexhibithighervariancethanactor–criticmeth-
+odssuchasPPO,wedeliberatelyadoptREINFORCEtoisolatetheimpactofstateandarchitecture
+designfromalgorithmicimprovements.Thischoicesimplifiesimplementationandalignswithstan-
+dard Transformer-based NCO practice, such as AM (Kool et al., 2019) and POMO (Kwon et al.,
+2020). Itkeepsthetrainingpipelineminimal,withoutadditionalcriticnetworksorauxiliarylosses,
+and allows us to focus on the impact of the proposed state representation and architecture rather
+than on the choice of specific RL algorithm. (However, we also implemented the PPO version of
+our method for a more comprehensive evaluation, which is presented in Appendix E.3). The re-
+wardisdefined(inEq.(3))asthenegativedifferencebetweentheestimatedlower-boundmakespan
+beforeandaftertakinganaction. DetailsofthetrainingalgorithmareprovidedinAppendixB.3.
+5 EXPERIMENTS
+In this section, we conduct extensive experiments on FJSP to demonstrate the effectiveness of
+RESCHED, comparing it with strong baselines and performing ablations on its key components.
+Asagenericframework,wealsoextendourevaluationtoJSSPandFFSPtoshowcaseitsgenerality.
+TrainingandEvaluationSettings WetrainRESCHEDonFJSPandtwovariants,JSSPandFFSP,
+respectively.Foreachproblem,wegenerateoneortwomillioninstancesfortraining,dependsonthe
+problemsize. Themodelsaretrainedonsmallerproblemsizesandevaluatedonsignificantlylarger
+ones as well as standard benchmarks: Bandimarte (Brandimarte, 1993) and Hurink (Hurink et al.,
+1994)forFJSP,Taillard(Taillard,1993)andDMU(Demirkoletal.,1998)forJSSP,andextended
+sizesupto100×12forFFSP4.Notably,forbothJSSPandFFSP,weuseonlyasingletrainingsize
+(10×10 for JSSP and 20×12 for FFSP) to demonstrate generalization capability. Additionally, we
+evaluatethepoliciesnotonlyusingagreedystrategy,butalsowithasamplingstrategy. Following
+HGNN (Song et al., 2023) and DANIEL (Wang et al., 2024b), for each test instance we run 100
+independent stochastic decoding trajectories of the policy in parallel, where at every decision step
+thenextoperation–machinepairissampledfromthenetwork’scategoricaloutput,andwereportthe
+solutionwiththesmallestmakespanamongthe100trajectories. Furtherdetailsofthedatasetand
+configurationsareprovidedinAppendixB.2. Ourcodeisavailableathttps://github.com/
+XiangjieXiao/ReSched.
+Baselines We compare RESCHED against three groups of baselines. (i) Classical priority dis-
+patchingrules(PDRs),includingFIFO,SPT,MOPNR,andMWKR.(ii)State-of-the-artDRL-based
+methods: HGNN (Song et al., 2023), DANIEL (Wang et al., 2024b), and DOAGNN (Zhao et al.,
+2025) for FJSP; L2D (Zhang et al., 2020) and RL-GNN (Park et al., 2021b) for JSSP; and Mat-
+Net (Kwon et al., 2021) for FFSP. (iii) Strong non-learning baselines, including the 2SGA ge-
+netic algorithm (Rooyani & Defersha, 2019) tailored for FJSP and the CP-SAT solver from OR-
+Tools(DaCol&Teppan,2019),whichweapplytobothFJSPandJSSPbenchmarks. Moredetails
+aregiveninAppendixB.3.
+5.1 PERFORMANCEONFJSP
+In-Distribution Performance Table 1 shows RESCHED outperforms all baselines on both
+SD (Songetal.,2023)andSD (Wangetal.,2024b)datasets,achievingsuperiorresultsin14/16
+1 2
+cases. TheadvantageismostpronouncedonchallengingSD
+2
+instances,whereRESCHEDreduces
+the gap by 30% versus DANIEL (15×10 case). Even on simpler SD instances, it maintains con-
+1
+sistent improvements, cutting DANIEL’s gap by half in 15×10 and 20×10 settings, demonstrating
+robustperformanceacrossdifficultylevels.
+4The notation n×m indicates n jobs and m machines(the number of operations per job varies across
+datasetsandisomittedhereforbrevity).
+8
+
+--- PAGE 9 ---
+PublishedasaconferencepaperatICLR2026
+Table1:Resultsondatasets:in-distribution(top);out-of-distribution(middle);benchmark(bottom)
+Dataset Size PDRs Greedy Sampling OR-Tools1
+FIFO SPT MOPNR MWKR HGNN DANIEL RESCHED HGNN DANIEL RESCHED
+1DS
+10×5 Gap(%)↓ 24.06 34.76 19.87 17.58 16.03 10.87 12.25 9.66 5.57 5.98 96.32(5%)
+20×5 Gap(%)↓ 14.87 22.56 13.85 11.51 12.27 5.03 4.63 10.31 2.46 2.33 188.15(0%)
+15×10 Gap(%)↓ 28.65 38.22 20.68 19.41 16.33 12.42 6.51 12.13 6.79 3.09 143.53(7%)
+20×10 Gap(%)↓ 19.22 30.25 12.20 10.30 10.15 1.31 0.48 9.64 -1.03 -1.55 195.98(0%)
+2DS
+10×5 Gap(%)↓ 76.47 57.96 72.52 70.01 71.42 25.68 16.36 49.71 12.57 6.39 326.24(96%)
+20×5 Gap(%)↓ 74.59 38.91 74.58 71.31 76.79 11.52 9.87 60.70 4.66 3.68 602.04(0%)
+15×10 Gap(%)↓ 132.23 86.74 125.32 121.45 115.26 57.16 18.14 101.52 38.70 9.81 377.17(28%)
+20×10 Gap(%)↓ 135.27 78.82 129.09 124.98 126.12 31.58 14.18 114.15 19.13 7.90 464.16(1%)
+TopPDRs Greedy Sampling
+Dataset Size SPT MWKR 10× H 5 GN 2 N 0×10 10× D 5 ANI 2 E 0 L ×10 10× RE 5 SC 2 H 0 ED ×10 10× H 5 GN 2 N 0×10 10× D 5 ANI 2 E 0 L ×10 10× RE 5 SC 2 H 0 ED ×10 OR-Tools
+1DS 30×10 Gap(%)↓ 27.47 13.96 14.61 14.01 5.10 2.50 3.44 2.69 12.36 13.49 4.43 1.67 3.49 1.51 274.67(6%)
+40×10 Gap(%)↓ 21.66 13.37 14.21 13.75 3.65 1.52 2.54 1.64 12.26 13.49 3.77 1.14 3.64 1.10 365.96(3%)
+2DS 30×10 Gap(%)↓ 59.74 122.89 126.55 123.57 14.85 11.95 8.79 6.30 115.21 111.51 9.47 4.80 3.59 1.40 692.26(0%)
+40×10 Gap(%)↓ 38.74 108.66 109.87 108.12 0.52 -1.67 -2.40 -4.58 102.45 99.26 -2.74 -6.60 -5.69 -7.61 998.39(0%)
+Strategy Dataset (T M op W P K D R R) H 10 G × NN 5 1 H 5 G × N 1 N 0 D 1 A 0 N × IE 5 L D 1 A 5 N × I 1 E 0 L DO 10 A × GN 5 N RE 10 SC × H 5 ED R 1 E 5 S × CH 1 E 0 D 2SGA OR-Tools UB2
+ydeerG
+Brandimarte Gap(%)↓ 28.91 28.52 26.77 13.58 12.97 31.64 9.083 12.49 175.20(3.17%) 174.20(1.5%) 172.7
+Hurink(edata) Gap(%)↓ 18.6 15.53 15.0 16.33 14.41 16.21 15.48 16.34 - 1028.93(-0.03%) 1028.88
+Hurink(rdata) Gap(%)↓ 13.86 11.15 11.14 11.42 12.07 11.83 10.18 10.31 - 935.80(0.11%) 934.28
+Hurink(vdata) Gap(%)↓ 4.22 4.25 4.02 3.28 3.75 4.32 3.48 2.55 812.20(0.39%) 919.60(-0.01%) 919.50
+gnilpmaS Brandimarte Gap(%)↓ 28.91 18.56 19.0 9.53 8.95 18.62 6.61 8.14 175.20(3.17%) 174.20(1.5%) 172.7
+Hurink(edata) Gap(%)↓ 18.6 8.17 8.69 9.08 8.72 8.46 8.13 10.39 - 1028.93(-0.03%) 1028.88
+Hurink(rdata) Gap(%)↓ 13.86 5.57 5.95 4.95 5.49 5.83 5.04 4.92 - 935.80(0.11%) 934.28
+Hurink(vdata) Gap(%)↓ 4.22 1.32 1.34 0.69 0.72 1.44 0.82 0.69 812.20(0.39%) 919.60(-0.01%) 919.50
+1.OR-Tools(1800sperinstance):solutionandoptimalratioreported;
+2.UBisthebest-knownsolution(Behnke&Geiger,2012),usedasthebaselinetocomputegaps;
+3.Instance-wiseaveragegapisreportedtoreducebiasfromvaryinginstancescales.
+   
+Table 3: Results on Taillard Benchmark for
+JSSP.    
+   
+PDRs DRL-based    
+Size SPT MWKR FDD/MWKR MOPNR L2D RL-GNN R 10 eS × ch 1 e 0 d OR-Tools UB    
+15×15 54.8 56.7 47.1 45.0 26.0 20.1 15.74 0.1 1233.9
+2
+2
+0
+0
+×
+×
+1
+2
+5
+0
+6
+6
+5
+4
+.
+.
+2
+2
+6
+5
+0
+5
+.
+.
+7
+7
+5
+4
+0
+7
+.
+.
+6
+6
+4
+4
+7
+2
+.
+.
+7
+8
+3
+3
+0
+1
+.
+.
+0
+6
+2
+2
+4
+9
+.
+.
+9
+2
+1
+1
+9
+6
+.
+.
+7
+3
+0
+0
+.
+.
+2
+7
+1
+1
+3
+6
+6
+1
+1
+7
+.
+.
+3
+1
+   
+30×15 61.6 52.6 45.0 45.6 33.0 24.7 21.5 2.1 1771.2
+30×20 66.0 63.9 56.3 48.2 33.6 32.0 22.5 2.8 1919.4      % U D Q G L P D U W H  H G D W D  U G D W D  Y G D W D
+50×15 51.4 40.9 34.8 30.1 22.4 15.9 16.1 0.0 2783.8
+50×20 59.5 53.9 41.5 37.9 26.5 21.3 15.6 2.8 2834.4
+100×20 41.0 32.9 23.4 20.2 13.6 9.2 9.6 3.9 5369.6
+  V   H P L W  J Q L Q Q X 5
+ ) , ) 2  + * 1 1
+ 6 3 7  ' $ 1 , ( /  0 2 3 1 5  ' 2 $ * 1 1  0 : . 5  5 ( 6 & + ( '
+Figure3: RunningTimeonFJSPBenchmark
+Generalization Performance RESCHED demonstrates strong generalization on both synthetic
+andbenchmarkdatasets(Table1). Onlargersyntheticinstances(30×10to40×10), itoutperforms
+DRL baselines in 6/8 cases, even surpassing OR-Tools by 7.61% on the challenging SD with
+2
+40×10setting.ForBrandimarteandHurinkbenchmarks,trainedsolelyonSD
+1
+,RESCHEDachieves
+bestperformancein7/8casesacrossbothstrategies. Notably,theDOAGNNdoesnotreportresults
+for the 15×10 setting, and is thus only compared using one configuration. Compared with strong
+non-learningbaselines,2SGAandOR-Tools(with3600stimelimit)canoftenobtainsolutionsvery
+closetothebest-knownupperbounds,butatthecostofsubstantiallylongercomputationtimedue
+tolengthypopulation-basedsearchorexactoptimization. Incontrast,oncetrained,RESCHEDpro-
+ducescompetitivesolutionswithinashortinferencetimeperinstance(seeFigure3),anditsperfor-
+mancecanbefurtherimprovedbysimplesampling-baseddecodingwithoutadditionaltrainingcost,
+makingitmoresuitablefortime-sensitiveorrepeatedlysolvedschedulingscenarios. Theseresults
+suggestRESCHED’spotentialforgeneralizationtoreal-worldsettingswithcomplexcharacteristics
+underpracticaltimebudgets.
+RunningTimeAnalysis Toevaluateruntimeefficiency,weconductexperimentsonopenbench-
+markinstancescharacterizedbydiverseproblemstructures. Eachalgorithmisindependentlyexe-
+cutedfivetimestoensurereliableresults,andtheiraveragerunningtimesarereportedinFigure3.
+Notably, ourmethodachievesaruntimecomparabletoexistingDRL-basedapproacheswhileout-
+performingcurrentstate-of-the-artmethodsintermsofschedulingquality.
+5.2 ABLATIONSTUDYANDROBUSTNESSANALYSIS
+We conduct ablation studies on RESCHED’s two key innovations: (1) the minimal representation
+and(2)attention-basedarchitecturalimprovements,byremovingeachdesignelementindividually.
+9
+
+--- PAGE 10 ---
+PublishedasaconferencepaperatICLR2026
+ResultsinTable5(AppendixB.3)confirmthatallcomponentscontributepositivelytoperformance.
+Additionally, weperformrobustnessanalysisbytraining RESCHED acrossmultiplerandomseeds
+to assess its stability and consistency. The results, presented in Table 6 (Appendix B.3), demon-
+stratethatthevariationacrossseedsisminimal(lessthan1%),furtherconfirmingthatRESCHED’s
+improvementsarebothrobustandconsistent.
+5.3 PERFORMANCEONJSSPANDFFSP
+We evaluate RESCHED’s generalization capability on the Taillard benchmark (Taillard, 1993) for
+JSSP.Trainedsolelyonsynthetic10×10instances(generatedunderthesamedistributionasZhang
+etal.(2020)),ourmodelisdirectlytestedonbenchmarkinstancesrangingfrom15×15to100×20
+by greedy strategy. The results in Table 3 show that, RESCHED outperforms L2D5 and RL-GNN
+in7outof8testsizes,evensurpassingtheirin-distributionperformance(trainedandtestedonthe
+same size). For reference, we also report the results of the CP-SAT solver in OR-Tools (Da Col
+&Teppan,2019)witha3600-secondtimelimitperinstance, whichprovidesstrongupperbounds
+on the Taillard instances. This demonstrates exceptional scalability, as no size-specific tuning is
+required,whichexhibitsourframework’sabilitytoadapttodifferentschedulingproblems. Results
+onin-distributionsettingsandtheDMUbenchmark,whenevaluatedwithagreedydecodingstrat-
+egy,alsoconfirmeditsconsistentsuperiority(seeAppendixB.3). WefurtherevaluateRESCHEDon
+FFSPunderMatNet’ssetting(Kwonetal.,2021). UnlikeMatNet,whichtrainsaseparatemodelfor
+eachsize(20/50/100),RESCHED,trainedonlyonsize20,achievesthebestresultsinmostsettings
+acrosssizesunderbothgreedyandsamplingstrategies(Table9). SameasMatNet,wealsouse24
+parallelsolutionsperinstance,whichshowedsuperiorgeneralization.
+6 CONCLUSION
+Inthispaper,wepresentRESCHED,anovelframeworkforsolvingschedulingproblemsusingdeep
+reinforcementlearning. RESCHED introducesasimplifiedstaterepresentationandaTransformer-
+basedarchitecture,whicheffectivelycapturesthestructuralandtemporalcharacteristicsofschedul-
+ing problems. Our extensive experiments on FJSP, JSSP, and FFSP demonstrate that RESCHED
+achieves favorable performance while maintaining high efficiency. The results highlight the po-
+tentialofRESCHEDasagenericframeworkforvariousschedulingtasks. However,RESCHEDcur-
+rentlyencodesonlyO2O/O2Minteractionwithself-attention/unidirectionalcross-attention;explicit
+machinetooperation(M2O)feedbackisnotyetmodeledandwillbeexploredinfuture. Moreover,
+wewillalsoinvestigatehowtoadaptourmethodtosearch-basedworks(Zhangetal.,2024).
+ACKNOWLEDGEMENTS
+ThisresearchissupportedbytheNationalResearchFoundation,SingaporeunderitsAISingapore
+Programme(AISGAwardNo: AISG3-RP-2022-031). ThisworkisalsosupportedbytheNational
+NaturalScienceFoundationofChina(No.62473233).
+REFERENCES
+Amulti-agentapproachtointelligenttransportationsystemsmodelingwithcombinatorialauctions.
+Expert Systems with Applications, 41(15):6622–6633, 2014. ISSN 0957-4174. doi: https://doi.
+org/10.1016/j.eswa.2014.05.015. URLhttps://www.sciencedirect.com/science/
+article/pii/S0957417414002954.
+ARArunarani,DhanabalachandranManjula,andVijayanSugumaran. Taskschedulingtechniques
+in cloud computing: A literature survey. Future Generation Computer Systems, 91:407–415,
+2019.
+JimmyLeiBa,JamieRyanKiros,andGeoffreyEHinton.Layernormalization.stat,1050:21,2016.
+DennisBehnkeandMartinJosefGeiger. Testinstancesfortheflexiblejobshopschedulingproblem
+withworkcenters. 2012.
+5WeonlyreportbestOODsettingforL2Dforshort
+10
+
+--- PAGE 11 ---
+PublishedasaconferencepaperatICLR2026
+Jacek Błaz˙ewicz, Erwin Pesch, and Małgorzata Sterna. The disjunctive graph machine represen-
+tationofthejobshopschedulingproblem. EuropeanJournalofOperationalResearch, 127(2):
+317–331,2000.
+PaoloBrandimarte. Routingandschedulinginaflexiblejobshopbytabusearch. AnnalsofOpera-
+tionsresearch,41(3):157–183,1993.
+RuiqiChen,WenxinLi,andHongbingYang.Adeepreinforcementlearningframeworkbasedonan
+attentionmechanismanddisjunctivegraphembeddingforthejob-shopschedulingproblem.IEEE
+TransactionsonIndustrialInformatics,19(2):1322–1331,2023. doi:10.1109/TII.2022.3167380.
+GiacomoDaColandErichCTeppan. Industrialsizejobshopschedulingtackledbypresentdaycp
+solvers. InInternationalConferenceonPrinciplesandPracticeofConstraintProgramming,pp.
+144–160.Springer,2019.
+EbruDemirkol,SanjayMehta,andRehaUzsoy. Benchmarksforshopschedulingproblems. Euro-
+peanJournalofOperationalResearch,109(1):137–141,Aug1998.doi:10.1016/s0377-2217(97)
+00019-2. URLhttps://doi.org/10.1016/s0377-2217(97)00019-2.
+KaiDing,FelixTSChan,XudongZhang,GuanghuiZhou,andFuqiangZhang. Definingadigital
+twin-basedcyber-physicalproductionsystemforautonomousmanufacturinginsmartshopfloors.
+InternationalJournalofProductionResearch,57(20):6315–6334,2019.
+DarkoDrakulic,SofiaMichel,FlorianMai,ArnaudSors,andJean-MarcAndreoli.Bq-nco:Bisimu-
+lationquotientingforefficientneuralcombinatorialoptimization.AdvancesinNeuralInformation
+ProcessingSystems,36:77416–77429,2023.
+Darko Drakulic, Sofia Michel, and Jean-Marc Andreoli. Goal: A generalist combinatorial opti-
+mizationagentlearner. InTheThirteenthInternationalConferenceonLearningRepresentations,
+2024.
+YiFeng,LuZhang,ZhileYang,YuanjunGuo,andDongshengYang. Flexiblejobshopscheduling
+based on deep reinforcement learning. In 2021 5th Asian Conference on Artificial Intelligence
+Technology(ACAIT),pp.660–666.IEEE,2021.
+Scarselli Franco, Gori Marco, Tsoi Ah Chung, Hagenbuchner Markus, and Monfardini Gabriele.
+Thegraphneuralnetworkmodel. IEEEtransactionsonneuralnetworks,20(1):61–80,2009.
+ReinhardHaupt.Asurveyofpriorityrule-basedscheduling.Operations-Research-Spektrum,11(1):
+3–16,1989.
+KaimingHe,XiangyuZhang,ShaoqingRen,andJianSun. Deepresiduallearningforimagerecog-
+nition. In Proceedings of the IEEE conference on computer vision and pattern recognition, pp.
+770–778,2016.
+JohannHurink,BerndJurisch,andMonikaThole. Tabusearchforthejob-shopschedulingproblem
+withmulti-purposemachines. Operations-Research-Spektrum,15(4):205–215,1994.
+ZangirIklassov,DmitriiMedvedev,RubenSolozabalOchoadeRetana,andMartinTakac. Onthe
+study of curriculum learning for inferring dispatching policies on the job shop scheduling. In
+EdithElkind(ed.),ProceedingsoftheThirty-SecondInternationalJointConferenceonArtificial
+Intelligence,IJCAI-23,pp.5350–5358.InternationalJointConferencesonArtificialIntelligence
+Organization,82023. doi: 10.24963/ijcai.2023/594. URLhttps://doi.org/10.24963/
+ijcai.2023/594. MainTrack.
+Wouter Kool, Herke van Hoof, and Max Welling. Attention, learn to solve routing problems! In
+InternationalConferenceonLearningRepresentations,2019. URLhttps://openreview.
+net/forum?id=ByxBFsRqYm.
+Yeong-DaeKwon, JinhoChoo, ByoungjipKim, IljooYoon, YoungjuneGwon, andSeungjaiMin.
+Pomo: Policyoptimizationwithmultipleoptimaforreinforcementlearning. AdvancesinNeural
+InformationProcessingSystems,33:21188–21198,2020.
+11
+
+--- PAGE 12 ---
+PublishedasaconferencepaperatICLR2026
+Yeong-DaeKwon,JinhoChoo,IljooYoon,MinahPark,DuwonPark,andYoungjuneGwon. Ma-
+trix encoding networks for neural combinatorial optimization. Advances in Neural Information
+ProcessingSystems,34:5138–5149,2021.
+Je-HunLeeandHyun-JungKim. Graph-basedimitationlearningforreal-timejobshopdispatcher.
+IEEETransactionsonAutomationScienceandEngineering,2024.
+KunLei,PengGuo,WenchaoZhao,YiWang,LinmaoQian,XiangyinMeng,andLianshengTang.
+Amulti-actiondeepreinforcementlearningframeworkforflexiblejob-shopschedulingproblem.
+ExpertSystemswithApplications,205:117796,2022.
+QuyuanLuo,ShihongHu,ChangleLi,GuanghuiLi,andWeisongShi.Resourceschedulinginedge
+computing: Asurvey. IEEEcommunicationssurveys&tutorials,23(4):2131–2165,2021.
+Junyoung Park, Sanjar Bakhtiyar, and Jinkyoo Park. Schedulenet: Learn to solve multi-agent
+schedulingproblemswithreinforcementlearning. arXivpreprintarXiv:2106.03051,2021a.
+Junyoung Park, Jaehyeong Chun, Sang Hun Kim, Youngkook Kim, and Jinkyoo Park. Learn-
+ing to schedule job-shop problems: representation and policy learning using graph neural net-
+workandreinforcementlearning. InternationalJournalofProductionResearch,pp.3360–3377,
+Jun2021b. doi: 10.1080/00207543.2020.1870013. URLhttp://dx.doi.org/10.1080/
+00207543.2020.1870013.
+AdamPaszke,SamGross,FranciscoMassa,AdamLerer,JamesBradbury,GregoryChanan,Trevor
+Killeen,ZemingLin,NataliaGimelshein,LucaAntiga,etal. Pytorch: Animperativestyle,high-
+performancedeeplearninglibrary. Advancesinneuralinformationprocessingsystems,32,2019.
+Danial Rooyani and Fantahun M Defersha. An efficient two-stage genetic algorithm for flexible
+job-shopscheduling. Ifac-Papersonline,52(13):2519–2524,2019.
+JohnSchulman,FilipWolski,PrafullaDhariwal,AlecRadford,andOlegKlimov. Proximalpolicy
+optimizationalgorithms. arXivpreprintarXiv:1707.06347,2017.
+Veronique Sels, Nele Gheysen, and Mario Vanhoucke. A comparison of priority rules for the job
+shopschedulingproblemunderdifferentflowtime-andtardiness-relatedobjectivefunctions. In-
+ternationalJournalofProductionResearch,50(15):4255–4270,2012.
+WenSong,XinyangChen,QiqiangLi,andZhiguangCao. Flexiblejob-shopschedulingviagraph
+neural network and deep reinforcement learning. IEEE Transactions on Industrial Informatics,
+19(2):1600–1610,2023. doi: 10.1109/TII.2022.3189725.
+Jianlin Su, Murtadha Ahmed, Yu Lu, Shengfeng Pan, Wen Bo, and Yunfeng Liu. Roformer: En-
+hancedtransformerwithrotarypositionembedding. Neurocomputing,568:127063,2024.
+E.Taillard.Benchmarksforbasicschedulingproblems.EuropeanJournalofOperationalResearch,
+pp.278–285,Jan1993.doi:10.1016/0377-2217(93)90182-m.URLhttps://doi.org/10.
+1016/0377-2217(93)90182-m.
+Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N Gomez,
+Łukasz Kaiser, and Illia Polosukhin. Attention is all you need. Advances in neural informa-
+tionprocessingsystems,30,2017.
+PetarVelickovic,GuillemCucurull,ArantxaCasanova,AdrianaRomero,PietroLio,YoshuaBen-
+gio,etal. Graphattentionnetworks. stat,1050(20):10–48550,2017.
+JinWang,JiaHu,GeyongMin,WenhanZhan,AlbertY.Zomaya,andNektariosGeorgalas. Depen-
+denttaskoffloadingforedgecomputingbasedondeepreinforcementlearning.IEEETransactions
+onComputers,71(10):2449–2461,2022. doi: 10.1109/TC.2021.3131040.
+Rongkai Wang, Yiyang Jing, Chaojie Gu, Shibo He, and Jiming Chen. End-to-end multi-target
+flexiblejobshopschedulingwithdeepreinforcementlearning. IEEEInternetofThingsJournal,
+2024a.
+12
+
+--- PAGE 13 ---
+PublishedasaconferencepaperatICLR2026
+RunqingWang,GangWang,JianSun,FangDeng,andJieChen. Flexiblejobshopschedulingvia
+dualattentionnetwork-basedreinforcementlearning.IEEETransactionsonNeuralNetworksand
+LearningSystems,35(3):3091–3102,2024b. doi: 10.1109/TNNLS.2023.3306421.
+YongWang,Zhi-YangRu,KezhiWang,andPei-QiuHuang. Jointdeploymentandtaskscheduling
+optimization for large-scale mobile users in multi-uav-enabled mobile edge computing. IEEE
+TransactionsonCybernetics,50(9):3984–3997,2020. doi: 10.1109/TCYB.2019.2935466.
+RonaldJWilliams. Simplestatisticalgradient-followingalgorithmsforconnectionistreinforcement
+learning. Machinelearning,8(3):229–256,1992.
+Xiang-JieXiao,YongWang,Pei-QiuHuang,andKezhiWang. Neuralcombinatorialoptimization
+for multiobjective task offloading in mobile edge computing. IEEE Transactions on Vehicular
+Technology,74(7):10869–10880,2025. doi: 10.1109/TVT.2025.3546914.
+YifanYang,GangChen,HuiMa,CongZhang,ZhiguangCao,andMengjieZhang. Graphassisted
+offline-online deep reinforcement learning for dynamic workflow scheduling. In International
+ConferenceonLearningRepresentations,2025.
+Cong Zhang, Wen Song, Zhiguang Cao, Jie Zhang, Puay Siew Tan, and Xu Chi.
+Learning to dispatch for job shop scheduling via deep reinforcement learning. In
+H. Larochelle, M. Ranzato, R. Hadsell, M.F. Balcan, and H. Lin (eds.), Advances in Neu-
+ral Information Processing Systems, volume 33, pp. 1621–1632. Curran Associates, Inc.,
+2020. URL https://proceedings.neurips.cc/paper_files/paper/2020/
+file/11958dfee29b6709f48a9ba0387a2431-Paper.pdf.
+CongZhang, ZhiguangCao, WenSong, YaoxinWu, andJieZhang. Deepreinforcementlearning
+guidedimprovementheuristicforjobshopscheduling. InTheTwelfthInternationalConference
+onLearningRepresentations,2024.
+PengZhao,YouZhou,DiWang,ZhiguangCao,YubinXiao,XuanWu,YuanshuLi,HongjiaLiu,
+Wei Du, Yuan Jiang, and Liupu Wang. Dual operation aggregation graph neural networks for
+solving flexible job-shop scheduling problem with reinforcement learning. In Proceedings of
+the ACM on Web Conference 2025, WWW ’25, pp. 4089–4100, New York, NY, USA, 2025.
+AssociationforComputingMachinery. ISBN9798400712746. doi: 10.1145/3696410.3714616.
+URLhttps://doi.org/10.1145/3696410.3714616.
+13
+
+--- PAGE 14 ---
+PublishedasaconferencepaperatICLR2026
+A STATE REPRESENTATION: FROM FJSP TO OTHER VARIANTS
+A.1 REVISITINGTHEFSJPFORMULATION
+InFJSP,foreachoperationnodeO ,wedefine:
+ij
+• ST : thestarttimeofoperationO ;
+ij ij
+• Dm: thedurationofoperationO onmachinem;
+ij ij
+• FT : thefinishtimeofoperationO .
+ij ij
+ForeachmachinenodeM ,wedefine:
+m
+• ATm: theavailabletimeofmachinematthecurrentschedulingstep.
+t
+Whenever am = 1, operation node O may start only satisfies the following two constraints:
+t,ij ij
+theoperationdependencyconstraintsandthemachineavailabilityconstraints. Thenthefinishtime
+FT andstarttimeST canbecomputedasfollows:
+ij ij
+FT =ST +Dm, ifam =1
+ij ij ij t,ij
+(7)
+ST =max
+(cid:0)
+FT
+,ATm(cid:1)
+ij i(j−1) t
+whereFT isthefinishtimeofpredeccessoroperationO inthejobJ .
+i(j−1) i(j−1) i
+Forthemachinenodes,theavailabletimeATmatsteptisupdatedasfollows:
+t
+(cid:26) FT ifam =1
+ATm = i′j′ t−1,i′j′ (8)
+t ATm otherwise
+t−1
+where(i′j′)istheoperationassignedtomachinematstept−1.
+Finally, for a scheduling problem like FJSP, we aim to optimize the solution A to minimize the
+makespanFT ,whichisdefinedasthemaximumfinishtimeacrossalloperations:
+max
+FT = max FT . (9)
+max ij
+(ij)∈O
+Remark1. AsweanalysedintheProposition1,itisunnecessarytoexplicitlyretainthefullhistory
+ofpaststates.Thismeanswedonotneedtodirectlytrackthefinishtimesofoperationsscheduledin
+previoussteps. However,sincethefinishtimeofanoperationO servesastheavailabletimefor
+ij−1
+itssuccessorO ,wecaninsteadmaintaintheoperationavailabletimeaquantitythatcapturesthe
+ij
+sameinformationinarecursivemanner. ThustheEq.(7)canbesimplifiedasEq.(2)inthemain
+text.
+Using the above formulation, for a given FJSP instance and feasible solution A, we can compute
+eachoperation’sstatusandmachine’sstatusateachschedulingstep.
+A.2 FROMFJSPTOOTHERSCHEDULINGPROBLEMS
+Fromheterogeneousgraphperspective, FJSPprovidesaunifiedformulationthatnaturallyextends
+totwoclassicalvariants: JSSPandFFSP.
+JSSPasaspecialcase. InJSSP,eachoperationistiedtoexactlyonemachineratherthanasetof
+machines. Consequently, the duration Dm and schedule am degenerate to D and a , respec-
+ij t,ij ij t,ij
+tively. TheO2Odependenciesremainunchanged,whereastheO2Mconnectionsbecomeone-hot.
+ThestaterepresentationandupdaterulesarethesameasinFJSP,withtrivialO2Mconnections.
+FFSPasaspecialcase. InFFSP,alljobsfollowanidenticalsequenceofstages,i.e.anidentical
+routingwithoneoperationperstage. Inthiscontext,an“operation”canbeviewedasastage. Each
+stagejisexecutedatastation,andundertheflexiblesetting,astationistypicallycomposedofmul-
+tipleparallelmachinescapableofperformingthesametask.Hence,FFSPcanbeviewedasanFJSP
+withM = M foralljobsi. TheO2Odependenciesreducetostage-to-stageprecedence,while
+ij j
+the O2M connections remain similar to FJSP, where each stage is connected to its corresponding
+station’smachines.
+14
+
+--- PAGE 15 ---
+PublishedasaconferencepaperatICLR2026
+Station 1 Station 2 Station 3
+4 8 3
+Stage 1 2 6 5
+4 5 5
+3 4 2 1 7
+9 2 2 3 3 3 2
+2 7 6 7 9 5
+JSSP Instance JSSP O2M Connection FFSP Instance FFSP O2M Connection
+Figure4: TheillustrationofJSSPandFFSPinstances,respectively.
+Implicationsforourframework. Acrossthesevariants,thecorestaterepresentationandupdate
+rulesremainconsistentwiththoseofFJSP.TheO2Odependenciesarepreserved;differencesarise
+onlyinthepatternofO2Mconnections,reflectingeachproblem’smachine-availabilityconstraints.
+Figure4illustratesbothvariantswithidenticalO2Odependenciesanddifferingmachine-availability
+constraints.
+B TRAINING ALGORITHM AND EXPERIMENT
+B.1 TRAININGALGORITHM
+WeintroducethetrainingalgorithmforRESCHEDinAlgorithm1. Thetrainingprocessfollowsthe
+REINFORCEalgorithm,wherewesampleactionsfromthepolicynetworkandcomputethepolicy
+lossbasedontherewardsreceived. Themodelparametersareupdatedusinggradientdescent.
+Algorithm1TrainingRESCHEDwithREINFORCE
+1: Input: SchedulingenvironmentE,modelparametersθ,numberofepochsE,trainingepisodes
+N,batchsizeB,learningrateα;
+2: forepoche=1toE do
+3: Initializescoreandlossmeter;
+4: whileep<N do
+5: GenerateBinstancesusingenvironmentE;
+6: Resettheenvironmenttogetinitialstates 0 ;
+7: Initializeemptytrajectory: T =∅;
+8: repeat
+9: Processcurrentstates t intomodelinput;
+10: Sampleactiona t ∼π θ (·|s t );
+11: Executea t togetrewardr t andnextstates t+1 ;
+12: Store(s t ,a t ,r t ,s t+1 )intoT;
+13: s t ←s t+1 ;
+14: untiltaskisfinished
+15: ComputereturnG t usingdiscountedcumulativerewards;
+16: Normalizeadvantages: A t =G t −mean(G t );
+(cid:80)
+17: ComputepolicylossL=− t A t logπ θ (a t |s t );
+18: Updateparameters: θ ←θ−α∇ θ L;
+19: ep←ep+B;
+20: endwhile
+21: Validateπ θ onvalidationset;
+22: endfor
+23: Output: Trainedmodelparametersθ
+15
+
+--- PAGE 16 ---
+PublishedasaconferencepaperatICLR2026
+B.2 EXPERIMENTDETAILS
+Datasets For FJSP, the model is trained on synthetic datasets SD (Song et al., 2023) and
+1
+SD (Wangetal.,2024b),toevaluateitsin-distributionperformance,andthenevaluatedonlarger
+2
+size as well as standard benchmark: Bandimarte (Brandimarte, 1993) and Hurink (Hurink et al.,
+1994).ThesyntheticdatasetsaregeneratedusingthesamemethodasinSongetal.(2023)andWang
+etal.(2024b). Specifically,foraninstanceofFJSPwithnjobsandmmachines:
+• SD : Duration Dm is uniformly sampled from [1,20]; Each job’s operations number is
+1 ij
+uniformlysampledfrom[0.8n,1.2n];
+• SD : Duration Dm is uniformly sampled from [1,99]; Each job’s operations number is
+2 ij
+uniformlysampledfrom[1,n].
+For JSSP, the model is trained on the synthetic dataset to evaluate its in-distribution performance,
+andthenevaluatedonthestandardbenchmark: Taillard(Taillard,1993)andDMU(Demirkoletal.,
+1998). The synthetic dataset is generated as follows: Duration D is uniformly sampled from
+ij
+[1,99];Eachjob’soperationsnumberisuniformlysampledfrom[1,n].
+ForFFSP,themodelistrainedonthesyntheticdatasetgeneratedwiththesamemethodasinKwon
+etal.(2021),toevaluateitsin-distributionperformanceandcross-sizegeneralizationperformance.
+Thesyntheticdatasetisgeneratedasfollows: DurationDm isuniformlysampledfrom[2,9];Each
+ij
+jobhas3stages,andeachstagehas4parallelmachinesasastation.
+Configurations The RESCHED framework is implemented in PyTorch (Paszke et al., 2019) and
+trained using the REINFORCE algorithm (Williams, 1992). The feature extraction network con-
+sists of 2-layer Transformer blocks, each with 8 attention heads, a hidden dimension of 128, and
+afeed-forwarddimensionof512. Thedecision-makingnetworkisa3-layerMLP,witheachlayer
+containing64hiddenunits,followingpriorworks(Zhangetal.,2020;Songetal.,2023;Wangetal.,
+2024b;Zhaoetal.,2025).WeusetheAdamoptimizerwithalearningrateof5×10−5.Themodelis
+trainedfor2000epochs,with1000traininginstancesperepochandabatchsizeof50. Thediscount
+factorγ issetto0.99. Duetoresourceconstraints,forlagersizedproblem,thenumberoftraining
+instancesperepochisreducedto500andthebatchsizeto24. Duringtraining,weusetheestimated
+lowerboundofthemakespanasthereward,asdescribedinEq.(3),withadiscountfactorof0.99.
+Themodelthatachievesthebestperformanceonthevalidationsetissavedandlaterevaluatedon
+thetestset(100generatedinstances)andbenchmarkdatasets. WeuseasingleNVIDIARTXA40
+GPUfortrainingandevaluation. Wewillreleasethecodeanddatagenerationscripts.
+Hyperparametertuningandreporting WetuneRESCHEDontheSD
+1
+10×5settingandkeep
+theselectedhyperparametersfixedforallotherdatasetsandsizes. Forbaselines,wedonotperform
+additionaltuningbeyondtheauthors’defaultsettings.Weeitherdirectlyreporttheresultsfromtheir
+original papers or use their open-source code with the provided hyperparameters and checkpoints
+to ensure a fair comparison. All baselines have open-source implementations; some also provide
+checkpoints.
+Baselines To assess the effectiveness of RESCHED, we compare it against both rule-based and
+DRL-basedbaselinescommonlyadoptedintheFJSPliterature. Thebaselinesaregroupedintotwo
+categories:
+(1)PriorityDispatchingRules(PDRs). Weincludefourwidelyusedheuristicrules:
+• FIFO(First-In-First-Out): Selectstheearliestoperation–machinepairbasedontheorder
+ofarrival.
+• SPT(ShortestProcessingTime): Selectsthepairwiththeshortestoperationduration.
+• MOPNR (Most Operations Remaining): Selects the pair associated with the job that has
+thelargestnumberofremainingoperations,breakingtiesbytheearliestmachineavailable
+time.
+• MWKR (Most Work Remaining): Selects the pair associated with the job that has the
+largesttotalremainingprocessingtime,usingtheaveragedurationofsuccessoroperations,
+andbreakstiesbytheearliestmachineavailabletime.
+16
+
+--- PAGE 17 ---
+PublishedasaconferencepaperatICLR2026
+These heuristics are widely adopted due to their efficiency, simplicity, and strong generalization
+ability,particularlyinlarge-scaleorunseenschedulinginstances(Selsetal.,2012). Weimplement
+these PDRs using the open-source code by Song et al. (2023) and keep the same hyperparameter
+settings.
+(2)NeuralmethodsforFJSPWealsocompareRESCHEDagainstthreerepresentativeGNN-based
+approachesdevelopedforFJSP:
+• HGNN (Song et al., 2023): Models the scheduling problem as a heterogeneous graph,
+whereoperationsandmachinesaretreatedasdistinctnodetypes.
+• DANIEL (Wang et al., 2024b): Employs a dual-attention mechanism to jointly capture
+operation–machineinteractions.
+• DOAGNN (Zhao et al., 2025): Leverages a decoupled disjunctive-graph formulation to
+betterencodeprecedenceandmachineconstraints.
+All three methods are DRL frameworks based on GNN or variants (e.g., GAT) (Velickovic et al.,
+2017),andusingthePPO(Schulmanetal.,2017)astrainingalgorithm. ForHGNNandDANIEL,
+we directly report the results from their original papers. For DOAGNN, we use their open-source
+code and evaluate it on the open benchmark using their provided checkpoints. Additionally, we
+retrainDANIELfromscratchinourablationstudytovalidateoursimplifiedfeatureset,maintaining
+thesamehyperparametersettingsasintheoriginalwork.
+(3) Neural methods for other variants Additionally, we compare RESCHED against two GNN-
+basedmethodstargetingJSSP;andatransformer-basedmethodforFFSP:
+• L2D(Zhangetal.,2020):Proposesanend-to-endDRLframeworkthatlearnssize-agnostic
+priority dispatching rules for JSSP, based on disjunctive graph representation and Graph
+IsomorphismNetworks.
+• RL-GNN(Parketal.,2021b): IntegratesRLwithaGNN-basedencoder-decodernetwork
+tosolveJSSP,capturingbothjobandmachinecontextsthroughdynamicgraphrepresenta-
+tions.
+• Matnet (Kwon et al., 2021): Introduces a matrix-based encoding of combinatorial struc-
+tures for routing problems and FFSP, enabling flexible attention across decision steps. It
+applies a transformer-style architecture to scheduling by encoding instance states as 2D
+matricesandtrainingviaREINFORCE.
+ForL2DandRL-GNN,wedirectlyreporttheresultsfromtheiroriginalpapers. ForMatnet,weuse
+theiropen-sourcecodetoretrainandevaluateitunderthedefaulthyperparameters.
+B.3 EXPERIMENTALRESULTS
+Ablation Study on DANIEL The input embedding for decision-making module in DANIEL is
+the concatenation of the operation, machine, pair and global embeddings, involving a total of 26
+features (10 for operation, 8 for machine, 8 for pair); the global embedding is learned and does
+not add additional raw features. To evaluate the effectiveness of each component, we conduct an
+ablation study by removing the components one by one. The experiments are conducted on the
+syntheticdatasetSD with15×10,andtheresultsareshowninTable4.
+2
+Table4: AblationstudyonDANIEL.
+setting Obj.↓ Avg.∆(%)↓
+DANIEL 589.44 56.28
+DelGlobal 589.12 56.19
+DelGlobalMA 588.66 56.07
+DelGloablMAP(-P6) 588.76 56.10
+DelGloablMAP(-P6)O(-O2379) 587.68 55.81
+WeconductanablationstudyonDANIELtoanalyzetheimpactofdifferentinputembeddings. The
+resultsinTable4revealthefollowinginsights:
+17
+
+--- PAGE 18 ---
+PublishedasaconferencepaperatICLR2026
+• Del Global: Removing the global embedding leads to a slight improvement, indicating
+thatthiscomponentmayintroduceredundancyornoise.
+• DelGlobalMA:Furtherremovingthemachineembedding,comprising8machine-related
+features, results in continued improvement, suggesting that the model can perform well
+withoutexplicitmachinedescriptors.
+• DelGlobalMAP(-P6): Basedonthepreviousexperiment,wefurtherprunethepair-wise
+featuresfrom8toasingle(6th)feature,whichstillmaintainsperformance. Thisindicates
+thatmostpairfeaturesarenotessentialforeffectivescheduling.
+• Del Global MA P(-P6) O(-O2379): Afterwards, based on all the previous experiments,
+weprunetheoperation featuresfrom10to4(retainingonly features2, 3, 7, and9), and
+theperformanceisstillcomparabletotheoriginalDANIEL.Thisfurthervalidatesthatthe
+fullfeaturesetisnotstrictlynecessaryforeffectivescheduling.
+In the last step above, we eliminate the number of features in DANIEL from 26 to only 5 (4 for
+operation, i.e. O2379, and1forpair-wise, i.e. P6), andtheperformanceisstillcomparabletothe
+originalDANIEL.
+Table5: AblationstudyonReSched.
+In-Distribution Out-of-Distribution OpenBenchmark
+Ablation Avg.∆(%)↓1
+10×5 30×10 40×10 Brandimarte
+Gap(%)↓ 12.25 3.44 2.54 9.08
+RESCHED
+∆(%)↓ 0.00 +0.10 0.00 0.00
++0.00
+Gap(%)↓ 16.42 6.74 3.83 14.48
+Connection +3.54
+∆(%)↓ +4.17 +3.30 +1.29 +5.40
+Gap(%)↓ 13.33 5.02 3.77 14.84
+RelativeAvailableTime +2.41
+∆(%)↓ +1.08 +1.58 +1.23 +5.76
+Gap(%)↓ 13.49 3.38 2.73 12.71
+CurrentTime +1.25
+∆(%)↓ +1.24 -0.06 +0.19 +3.63
+Gap(%)↓ 12.81 3.34 2.75 14.97
+RoPE +1.64
+∆(%)↓ +0.56 -0.10 +0.21 +5.89
+Gap(%)↓ 12.56 4.28 3.44 13.02
+EdgeinAtt +1.50
+∆(%)↓ +0.31 +0.84 +0.90 +3.94
+Gap(%)↓ 13.16 4.67 3.72 16.10
+Self-basedCA +2.59
+∆(%)↓ +0.91 +1.23 +1.18 +7.02
+∆(%)indicatesthegapdeviationfromstandardRESCHED.
+Avg.∆summarizesoverallperformancedeteriorationacrossalldatasets.
+Ablation Study on RESCHED To evaluate the effectiveness of each proposed component in
+RESCHED, we conduct comprehensive ablation studies to analyze our simplified state representa-
+tionandnetworkarchitecture. Specifically,weindividuallyremovesixkeyideasfromourstandard
+framework,includingsimplificationsandattention-relatedimprovements. Theablationsettingsare
+illustratedasfollows:
+• Connection: RemovingtheO2Oconnection,andusingtheoriginalbidirectionalconnec-
+tion,whicharewidelyusedinpreviousworks(Zhangetal.,2020;Songetal.,2023;Wang
+etal.,2024b;Zhaoetal.,2025).
+• RelativeAvailableTime: Replacingtherelativeavailabletimewiththeabsoluteavailable
+time(foroperationandmachine).
+• Current Time: Using the absolute current time to prune the action space as in previous
+works(Songetal.,2023;Wangetal.,2024b;Zhaoetal.,2025).
+• RoPE:RemovingtheRoPEmechanisminoperationbranch.
+• EdgeinAtt:Removingtheedgefeaturesincross-attentionmechanisminmachinebranch.
+• Self-basedCA:Removingtheself-basedcross-attentionmechanisminmachinebranch.
+AllvariantsaretrainedonthesmallestSD dataset(10×5)andevaluatedonfourtestsettings, in-
+1
+cludingin-distribution,out-of-distribution(30×10and40×10),andachallengingopenbenchmark
+(Bandrimarte). AsshowninTable5,eachcomponentcontributestotheoverallperformance,con-
+firmingtheeffectivenessandnecessityofourdesignchoices.
+18
+
+--- PAGE 19 ---
+PublishedasaconferencepaperatICLR2026
+Table6: PerformanceofRESCHEDtrainedwithREINFORCEacrossfourrandomseeds.
+Dataset DANIEL RESCHED-Avg. RESCHED-Orig. Seed1 Seed2 Seed3
+In-distribution
+SD -10×05 10.87 11.75 12.25 11.40 12.33 11.03
+1
+Out-of-distribution
+SD -30×10 5.10 3.10 3.44 2.46 3.39 3.09
+1
+SD -40×10 3.65 2.23 2.54 1.64 2.46 2.26
+1
+SD -30×10 14.85 9.04 8.79 9.35 9.78 8.22
+2
+SD -40×10 0.52 -2.61 -2.40 -3.00 -1.80 -3.23
+2
+Avg. 6.03 2.94 3.09 2.61 3.46 2.59
+OpenBenchmark
+Brandimarte 13.58 10.28 9.08 11.70 10.10 10.24
+Hurink(edata) 16.33 15.84 15.48 16.46 15.52 15.88
+Hurink(rdata) 11.42 10.13 10.18 10.30 10.46 9.57
+Hurink(vdata) 3.28 2.90 3.48 2.60 2.55 2.95
+Avg. 11.15 9.78 9.56 10.27 9.66 9.66
+Valuesareaverageoptimalitygaps(%)w.r.t.thebest-knownupperbounds.
+”RESCHED-Avg.”denotesthemeanoverallfourRESCHEDruns(original+threeadditionalseeds).
+Robustness Evaluation under Multiple Random Seeds To verify the robustness of our frame-
+work, we reran RESCHED (REINFORCE version) on the SD
+1
+-10×5 training setting with three
+additionalindependentrunsusingdifferentrandomseeds(fourrunsintotal,includingtheoriginally
+reportedinTable1).Foreachrun,weevaluatedthepolicyacrossin-distribution,out-of-distribution,
+andopenbenchmarktestsettingstocomprehensivelytesttheperformanceof RESCHED. Forease
+ofcomparison,Table6reportsinthesecondcolumntheaverageoverallfourindependentruns(the
+originally reported run plus the three new ones), while the subsequent columns list the results of
+each individual run. On out-of-distribution and open benchmark tests, all RESCHED runs outper-
+formDANIEL,whilein-distributionperformanceonSD –10×5remainscomparable.Moreover,the
+1
+variationacrossseedsismuchsmallerthantheperformancegapbetweenRESCHEDandDANIEL,
+indicatingthatourgainsarerobustandnotduetoafortunatechoiceofrandomseed.
+Performance on JSSP with Synthetic Data and DMU Benchmark In the main text, we have
+reportedtheperformanceof RESCHED ontheTaillardbenchmark. Here, wealsoevaluateitsper-
+formance on synthetic JSSP data and the DMU benchmark. The synthetic data is generated using
+thesamemethodasinZhangetal.(2020),andtheDMUbenchmarkisawidelyusedbenchmarkfor
+JSSP.TheresultsareshowninTable7andTable8,respectively. SimilartotheTaillardbenchmark,
+RESCHED achieves the best performance on both synthetic data and DMU benchmark by solely
+usingthesamemodeltrainedonthe10×10syntheticdata.
+Table7: PerformanceonsyntheticdatasetsofJSSP.
+PDRs DRL-based
+Size RESCHED Opt.Rate(%)1
+SPT MWKR FDD/MWKR MOPNR L2D
+10×10
+6×6 42.0 34.6 24.0 29.2 17.7 7.0 100
+10×10 50.0 42.6 36.6 36.5 22.3 9.5 100
+15×15 59.2 52.6 45.1 42.6 26.7 14.3 99
+20×20 62.0 58.6 49.6 45.5 29.0 15.0 4
+30×20 65.3 58.7 48.6 44.7 29.2 16.0 12
+50×20 54.9 48.1 38.4 33.7 22.1 12.8 48
+100×20 35.1 27.0 19.6 14.7 9.4 4.3 2
+Opt.RateistherateofinstancesforwhichOR-Toolsreturnstheoptimalsolution.
+19
+
+--- PAGE 20 ---
+PublishedasaconferencepaperatICLR2026
+Table8: PerformanceonDMUbenchmarkofJSSP.
+PDRs DRL-based
+Size RESCHED UB1
+SPT MWKR FDD/MWKR MOPNR L2D
+10×10
+20×15 64.1 62.1 53.6 49.2 39.0 23.72 3023.8
+20×20 64.6 58.2 52.5 45.2 37.7 22.2 3472.6
+30×15 62.6 60.9 54.1 47.1 41.9 27.8 3879.0
+30×20 65.9 63.2 60.1 52.0 39.5 28.3 4248.4
+40×15 55.9 52.9 51.4 44.7 35.4 26.5 4871.2
+40×20 63.0 61.1 55.5 49.2 39.4 29.2 5240.9
+50×15 50.38 48.94 52.55 40.78 36.2 26.3 5950.6
+50×20 62.2 56.4 57.3 49.6 38.8 31.8 6227.3
+1.UpperBound(UB)isthebestknownsolution(available)foreachinstance.
+2.Instance-wiseaveragegapisreportedtoprovideahigheraccuracy.
+Table9: PerformanceonFFSP.
+Greedy Sampling
+setting FFSP20 FFSP50 FFSP100 FFSP20 FFSP50 FFSP100
+Matnet20 28.05 52.58 93.00 27.31 52.36 93.40
+Matnet50 27.78 52.05 92.17 27.05 51.55 91.86
+Matnet100 27.64 51.79 91.79 27.09 51.40 91.50
+ReSched20 26.65 51.24 92.28 25.12 49.65 90.80
+PerformanceonFFSP Inthemaintext,wereportedtheoverallperformanceofRESCHEDonthe
+FFSP.Here,wepresentthedetailedresultsinTable9.
+C THEORETICAL ACCELERATION OPPORTUNITIES: KV CACHE
+TheRESCHEDframeworkallowsfortheoreticalaccelerationviaaKey-Value(KV)cachingmech-
+anism,owingtothefollowingstructuralproperties:
+• Backward-lookingedges: Eachoperationnodeisupdatedonlybyitssuccessoroperation;
+• Therepresentationofeachsuccessoroperationisfixed(determinedbytheminimumdura-
+tion);
+• Operation nodes are not updated by machine nodes, which contain dynamic features that
+varyacrossschedulingsteps.
+AsillustratedinFigure5,thisstructureenablesustocacheandreusethekey-valuepairsofprevi-
+ouslycomputedoperationnodesduringmulti-stepdecoding,avoidingredundantcomputationacross
+steps. Toseethis, consideraninstancewithnoperationsandmmachines, decodedinndecision
+steps by an L-layer Transformer. Without KV cache, at each step the O2O branch performs self-
+attention over n operation nodes, with complexity O(Ln2), and the O2M branch performs cross-
+attentionbetweenmmachinequeriesandnoperationkeys/values,withcomplexityO(Lmn). Over
+ndecodingsteps,thetotalattentioncostistherefore
+O (cid:0) L(n3+mn2) (cid:1) .
+WithKVcache,theoperationrepresentations(andtheirkeys/values)arecomputedonlyonceinthe
+O2Obranch,withcostO(Ln2),andthenreusedatalllatersteps;theO2Mbranchstillneedstobe
+recomputedateachstepduetochangingmachineavailability,givingatotalcostof
+O (cid:0) Ln2(1+m) (cid:1) .
+Theasymptoticreductioninattentioncomputationisthusbyafactorof
+L(n3+mn2) n+m
+= ,
+Ln2(1+m) 1+m
+20
+
+--- PAGE 21 ---
+PublishedasaconferencepaperatICLR2026
+Operation with Available Time Operation with Available Time
+Computed by this step Computed by earlier steps
+Step 1 Step 2
+Figure5: IllustrationoftheKVcachemechanisminRESCHED.
+whichapproaches n whenn≫m,acommonregimeinschedulingwherethenumberofopera-
+1+m
+tionsgreatlyexceedsthenumberofmachines.Inourexperimentalsettings,thenumberofoperations
+istypically10–40timeslargerthanthenumberofmachines(i.e.,n≈10m–40m),whichimpliesa
+reductionofabout10–40×inattentioncomputationwhenKVcacheisapplied.
+While this caching mechanism is not yet implemented in our current experiments, it presents a
+promisingfuturedirectionforfurtherinference-timeacceleration.
+D PROOF OF STATE-DEPENDENT OPTIMALITY IN SCHEDULING
+Proof. Fix any decision step t and any state S ∈ S. By Definition 4.1, S uniquely specifies
+t t
+the following elements: (i) the available time ATm of each machine m; (ii) for every job j, the
+t
+completion status of its operations up to t, which is equivalent to knowing the finish time of the
+most recently scheduled operation of j; (iii) the operation–operation dependency (O2O); and (iv)
+theoperation–machinefeasibilitygraphwithduration(O2M).
+LetObethesetofalloperationsintheschedulinginstancedescribedbyS . Fromelement(ii),we
+t
+canuniquelydeterminethesubset
+Odone(S )⊆O
+t
+ofoperationsthathavealreadybeencompletedbystept,andhencethesetofremainingoperations
+Orem(S ):=O\Odone(S ).
+t t
+Fromelements(iii)and(iv),weknowforeverypairofoperationsinO theirprecedencerelations,
+andforeveryoperationinOthesetoffeasiblemachinestogetherwiththecorrespondingdurations.
+RestrictingtheserelationstoOrem(S )yields
+t
+(a)allremainingprecedenceconstraintsamongoperationsinOrem(S ),
+t
+(b)allremainingdurationandmachine-feasibilityconstraintsforoperationsinOrem(S ).
+t
+Finally, element (i) gives the current available time ATm of every machine m. From element (ii)
+t
+weknowexactlywhichoperationshavealreadybeencompleted,andthusthesetofremainingop-
+erationsOrem(S ). Element(iii)specifiesallprecedenceconstraintsbetweenoperations;restricting
+t
+ittoOrem(S )yieldstheremainingO2Odependencies. Element(iv)specifies,foreachoperation,
+t
+the set of feasible machines and their processing durations; restricting it to Orem(S ) yields the
+t
+remainingO2Mrelations.
+AnyfeasiblecompletionoftheschedulestartingfromS musttherefore1)assigneachoperationin
+t
+Orem(S )toexactlyonemachinethatisfeasibleaccordingtotherestrictedO2Mgraph;2)respect
+t
+allrestrictedprecedenceconstraintsamongoperationsinOrem(S ); and3)chooseastarttimefor
+t
+eachoperationthatisnotearlierthanboththeavailabletimeATm ofitsassignedmachineandthe
+t
+finishtimesofallitspredecessors.
+Let F(S ) denote the set of all schedules for the remaining operations that satisfy 1)–3). By con-
+t
+struction,thisfeasiblecompletionsetF(S )iscompletelydeterminedbythetuple
+t
+(cid:0) AT(·), Orem(S ), restrictedO2O, restrictedO2M (cid:1) ,
+t t
+21
+
+--- PAGE 22 ---
+PublishedasaconferencepaperatICLR2026
+which itself is uniquely determined by S through elements (i)–(iv) above. In particular, F(S )
+t t
+dependsonlyonthecurrentstateS andnotonwhichtrajectoryhasledtoS .
+t t
+Now consider any two scheduling trajectories τ and τ (possibly defined on different execution
+1 2
+histories) that reach the same state S . Let F(S ) denote the set of all feasible completions of
+t t
+the schedule starting from S , that is, all feasible ways to schedule the remaining operations in
+t
+Orem(S ). Since F(S ) is a function of S only, the feasible solution set for the remaining sub-
+t t t
+problem induced by τ and τ is identical. For any objective that depends only on the operation
+1 2
+finish times (for example, the makespan), each completion in F(S ) has the same objective value
+t
+regardlessofwhetheritisviewedasacontinuationofτ orτ . Hencetheoptimalobjectivevalue
+1 2
+andthesetofoptimalcompletionsfromS arethesameforbothtrajectories. Thisprovesthatthe
+t
+corresponding remaining subproblems share an identical feasible solution set and the same set of
+optimalsolutions,whichestablishestheproposition.
+E RESCHED WITH PROXIMAL POLICY OPTIMIZATION
+In the main paper we train RESCHED with REINFORCE, following standard practice in
+Transformer-based neural combinatorial optimization (e.g., AM (Kool et al., 2019) and
+POMO (Kwon et al., 2020)). This choice keeps the implementation simple and allows us to fo-
+cusonourmaincontributions,namelythestaterepresentationandnetworkarchitecture. Toverify
+thatourframeworkisnottiedtoREINFORCE,andtoalignwiththePPO-basedbaselineDANIEL,
+wealsoimplementaPPOversionofRESCHED(denotedasRESCHED-PPO).
+E.1 TRAININGALGORITHMWITHPPO
+WealsotrainRESCHEDwithProximalPolicyOptimization(PPO)usingaclippedsurrogateobjec-
+tiveandgeneralizedadvantageestimation(GAE);theprocedureissummarizedinAlgorithm2.
+E.2 PPOCONFIGURATIONANDEXPERIMENTALSETUP
+InthePPOversion, wekeepthestaterepresentationandnetworkarchitectureidenticaltotheRE-
+INFORCEversion.ThePPOimplementationfollowstheclipped-surrogatevariantwithgeneralized
+advantage estimation (GAE). Unless otherwise stated, we adopt the same critic architecture and
+PPOhyperparametersasDANIEL(Wangetal.,2024b),i.e.,discountfactorγ =1,GAEparameter
+λ=0.98,cliprangeε=0.2,value-losscoefficientc =0.5andentropycoefficientc =0.01.The
+v e
+criticsharestheencoderwiththepolicynetworkandaddsasmallMLPheadthatoutputsascalar
+statevalueV (s ).
+θ t
+Experimentalsetting. WeevaluateRESCHED-PPOonourmaintask,FJSP,andforsimplicitywe
+restrictthecomparisontothestrongestDRL-basedmethodspecificallydesignedforFJSP,DANIEL.
+We keep the same training and test splits as in the main paper: models are trained on synthetic
+instances from the SD /SD datasets and evaluated under a greedy decoding strategy on (i) in-
+1 2
+distribution synthetic instances, (ii) out-of-distribution synthetic instances of larger sizes, and (iii)
+openFJSPbenchmarks.
+Trainingbudget. Forclarity,wemeasurethetrainingbudgetintermsoftheeffectivenumberof
+trajectoryupdates.
+In vanilla REINFORCE, each sampled trajectory is used once for a single gradient update. In the
+main-paper configuration, we run 2000 updates and collect 1000 trajectories per update, which
+yields2000×1000=2,000,000trajectories. Weadoptedthisrelativelylargebudgettocompensate
+forthehighervarianceandlowersampleefficiencyofREINFORCEandtostabilizetraining.
+InPPO,foreachpolicyupdatewecollectabatchofB trajectoriesfromtheenvironmentandreuse
+themforK optimizationepochs,whichcorrespondstoBK effectivetrajectoriesperpolicyupdate.
+To disentangle the effect of the RL algorithm from that of the training budget, and to enable a
+fair comparison with DANIEL, we consider two budget regimes: In the small-budget setting, we
+choose U = 400 updates with B = 50 trajectories per update and K = 4 PPO epochs, resulting
+in 400 × 50 × 4 = 80,000 effective trajectory updates. This matches the training budget used
+22
+
+--- PAGE 23 ---
+PublishedasaconferencepaperatICLR2026
+Algorithm2TrainingRESCHEDwithPPO
+1: Input: schedulingenvironmentE,modelparametersθ,totalnumberofpolicyupdatesU,num-
+ber of trajectories per update B, mini-batch size M, number of PPO epochs K per update,
+discountfactorγ,GAEparameterλ,cliprangeε,learningrateα
+2: forupdateu=1toU do
+3: Setoldparametersθ ←θ;
+old
+4: InitializebufferD ←∅;
+5: fori=1toBdo
+6: SampleatraininginstancefromE andresettogetinitialstates 0 ;
+7: InitializetrajectoryT ←∅;
+8: repeat
+9: Encodecurrentstates t andcomputeπ θold (·|s t )andV θold (s t );
+10: Sampleactiona t ∼π θold (·|s t );
+11: Executea t toobtainrewardr t andnextstates t+1 ;
+12: Store(s t ,a t ,r t ,V θold (s t ),logπ θold (a t |s t ))intoT;
+13: s t ←s t+1 ;
+14: untiltheschedulinginstanceisfinished
+15: AppendalltimestepsinT tobufferD;
+16: endfor
+17: UsingrewardsandoldvaluesinD,computereturnsR t andadvantagesAˆ t withGAE(γ,λ);
+18: forPPOepochk =1toK do
+19: ShuffleDandsplitintomini-batchesofsizeM;
+20: foreachmini-batchB ⊂Ddo
+21: Forall(s t ,a t )inB,computeπ θ (·|s t )andV θ (s t );
+22: Letp t =π θ (a t |s t ),po t ld =π θold (a t |s t ),andr t =p t /po t ld;
+23: Policyloss:
+L =−E (cid:104) min (cid:0) r Aˆ , clip(r ,1−ε,1+ε)Aˆ (cid:1)(cid:105) ;
+policy t∈B t t t t
+24: Valuelosswithclipping:
+(cid:104) (cid:16)
+L =E max (V (s )−R )2,
+value t∈B θ t t
+(cid:17)(cid:105)
+(V (s )+clip(V (s )−V (s ),−ε,ε)−R )2 .
+θold t θ t θold t t
+25: Entropybonus: L entropy =−E t∈B [H(π θ (·|s t ))];
+26: Totalloss: L=L policy +c v L value +c e L entropy ;
+27: Updateparameters: θ ←θ−α∇ θ L;
+28: endfor
+29: endfor
+30: Optionallystepthelearning-rateschedulerandevaluateπ θ onavalidationset;
+31: endfor
+32: Output: trainedmodelparametersθ
+by DANIEL, for which we report the original DANIEL results while retraining both RESCHED-
+REINFORCEandRESCHED-PPOunderthesamebudget. Inthelarge-budgetsetting,weincrease
+U by a factor of 25 so that both DANIEL and RESCHED-PPO are retrained with approximately
+2,000,000effectivetrajectoryupdates,matchingthebudgetofouroriginalRESCHED-REINFORCE
+configuration,forwhichwedirectlyreusethemain-papermodel.
+E.3 COMPARISONOFRESCHEDANDDANIELUNDERDIFFERENTTRAININGBUDGETS
+TheresultsforDANIEL,RESCHED-REINFORCE,andRESCHED-PPOarereportedinTable10.
+In-distribution performance under a small training budget. Under the small-budget configu-
+ration, RESCHED-PPO converges in noticeably fewer updates than RESCHED-REINFORCE and
+23
+
+--- PAGE 24 ---
+PublishedasaconferencepaperatICLR2026
+Table10: ResultsonFJSP:in-distribution(top);out-of-distribution(middle);benchmark(bottom)
+Dataset Size FIFO SPT PD M R O s PNR MWKR DANIEL RES S C m HE a D ll - t R r E ai I n N in F g O b R u C d E get RESCHED-PPO DANIEL RES L C a H r E g D e - t R r E ai I n N in F g OR bu C d E get RESCHED-PPO OR-Tools1
+1DS
+10×5 Gap(%)↓ 24.06 34.76 19.87 17.58 10.87 14.61 11.20 9.22 12.25 11.48 96.32(5%)
+20×5 Gap(%)↓ 14.87 22.56 13.85 11.51 5.03 8.51 5.84 3.08 4.63 4.20 188.15(0%)
+15×10 Gap(%)↓ 28.65 38.22 20.68 19.41 12.42 12.91 9.41 10.84 6.51 5.21 143.53(7%)
+20×10 Gap(%)↓ 19.22 30.25 12.20 10.30 1.31 6.97 3.50 -0.43 0.48 -0.36 195.98(0%)
+2DS
+10×5 Gap(%)↓ 76.47 57.96 72.52 70.01 25.68 19.06 15.77 24.75 16.36 14.24 326.24(96%)
+20×5 Gap(%)↓ 74.59 38.91 74.58 71.31 11.52 10.76 9.21 8.86 9.87 6.83 602.04(0%)
+15×10 Gap(%)↓ 132.23 86.74 125.32 121.45 57.16 24.03 25.02 53.94 18.14 16.73 377.17(28%)
+20×10 Gap(%)↓ 135.27 78.82 129.09 124.98 31.58 17.91 19.38 28.89 14.18 13.79 464.16(1%)
+Avg. Gap(%)↓ 63.17 48.53 58.51 55.82 19.45 14.35 12.42 17.39 10.30 9.02 -
+TopPDRs Smalltrainingbudget Largetrainingbudget
+Dataset Size SPT MWKR 10× D 5 ANI 2 E 0 L ×10 1 R 0 E × SC 5 HED-RE 2 I 0 N × FO 10 RCE 1 R 0 E × S 5 CHE 2 D 0 -P × PO 10 10× D 5 ANI 2 E 0 L ×10 1 R 0 E × SC 5 HED-RE 2 I 0 N × FO 10 RCE 1 R 0 E × S 5 CHE 2 D 0 -P × PO 10 OR-Tools
+1DS 30×10 Gap(%)↓ 27.47 13.96 5.10 2.50 9.26 4.43 3.21 4.50 2.05 1.45 3.44 2.69 2.81 1.91 274.67(6%)
+40×10 Gap(%)↓ 21.66 13.37 3.65 1.52 8.04 3.37 2.19 3.23 0.98 0.53 2.54 1.64 2.06 1.45 365.96(3%)
+2DS 30×10 Gap(%)↓ 59.74 122.89 14.85 11.95 37.76 8.17 8.97 11.96 21.51 18.59 8.79 6.30 5.16 7.05 692.26(0%)
+40×10 Gap(%)↓ 38.74 108.66 0.52 -1.67 23.25 -3.39 -3.51 -1.29 4.60 0.05 -2.40 -4.58 -6.02 -6.02 998.39(0%)
+Avg. Gap(%)↓ 36.90 64.72 6.03 3.58 19.58 3.15 2.72 4.60 7.29 5.16 3.09 1.51 1.00 1.10 -
+Strategy Dataset (T M op W P K D R R) 10× D 5 ANI 1 E 5 L ×10 1 R 0 E × SC 5 HED-RE 1 I 5 N × FO 10 RCE 1 R 0 E × S 5 CHE 1 D 5 -P × PO 10 2SGA OR-Tools UB2
+Brandimarte Gap(%)↓ 28.91 13.58 12.97 13.50 14.33 10.52 10.77 175.20(3.17%) 174.20(1.5%) 172.7
+Hurink(edata) Gap(%)↓ 18.60 16.33 14.41 18.06 16.34 18.29 20.00 - 1028.93(-0.03%) 1028.88
+Smalltrainingbudget Hurink(rdata) Gap(%)↓ 13.86 11.42 12.07 10.28 9.92 10.45 13.44 - 935.80(0.11%) 934.28
+Hurink(vdata) Gap(%)↓ 4.22 3.28 3.75 2.67 2.82 4.26 3.60 812.20(0.39%) 919.60(-0.01%) 919.50
+Avg. Gap(%)↓ 16.40 11.15 10.80 11.13 10.86 10.88 11.95 - - -
+Brandimarte Gap(%)↓ 28.91 14.10 14.58 9.08 12.49 10.34 10.97 175.20(3.17%) 174.20(1.5%) 172.7
+Hurink(edata) Gap(%)↓ 18.60 14.67 15.71 15.48 16.34 16.25 18.16 - 1028.93(-0.03%) 1028.88
+Largetrainingbudget Hurink(rdata) Gap(%)↓ 13.86 11.20 10.34 10.18 10.31 10.59 10.42 - 935.80(0.11%) 934.28
+Hurink(vdata) Gap(%)↓ 4.22 3.17 3.42 3.48 2.55 6.41 3.98 812.20(0.39%) 919.60(-0.01%) 919.50
+Avg. Gap(%)↓ 16.40 10.79 11.01 9.56 10.42 10.90 10.88 - - -
+1.OR-Tools(1800sperinstance):solutionandoptimalratioreported;
+2.UBisthebest-knownsolution(Behnke&Geiger,2012),usedasthebaselinetocomputegaps;
+3.Instance-wiseaveragegapisreportedtoreducebiasfromvaryinginstancescales.
+achievesthebestaveragein-distributionperformance,withanaveragegapof12.42%comparedto
+14.35%forRESCHED-REINFORCEand19.45%forDANIEL.EventheREINFORCEversion,de-
+spiteitsslowerconvergence,stillsurpassesDANIELintermsofaverageoptimalitygap,indicating
+thatthemaingaincomesfromourarchitectureratherthanfromusingalargertrainingbudget. PPO
+furtherexploitsthelimiteddatamoreefficientlythanREINFORCE,yieldingthebestaverageresults
+amongallcomparedmethods.
+Out-of-distributionperformanceunderasmalltrainingbudget. Intheout-of-distributionset-
+ting,modelstrainedonSD -10×5andSD -20×10areevaluatedonlargerunseeninstances. Under
+1 1
+the small training budget, as shown in Table 10, RESCHED-PPO trained only on SD
+1
+-10×5 al-
+ready achieves the best average OOD performance, achieves the best average OOD performance
+(2.72% gap), outperforming both DANIEL and RESCHED-REINFORCE, showing that our archi-
+tecturecombinedwithPPOcangeneralizewellevenwhentrainedonthesmallestproblemsizewith
+limiteddata. Incontrast, theREINFORCEversiontrainedonSD -10×5generalizespoorlyunder
+1
+thissmallbudget,whichisattributedtoitslowersampleefficiency. However,whenthetrainingsize
+isincreasedtoSD -20×10(withthesamebudget),itsOODperformanceimprovessubstantiallyand
+1
+becomescomparabletoDANIEL.Overall,theseresultsindicatethatourarchitecturedoesgeneral-
+ize beyond the training size, with PPO exploiting limited data more efficiently (as PPO trains the
+policy multiple times on the same data), whereas REINFORCE requires somewhat richer training
+instancestoreachasimilarlevelofOODperformance.
+Open benchmark performance under a small training budget. On the open benchmark sets,
+all DRL-based methods achieve very similar average performance under the small training bud-
+get. In particular, the REINFORCE and PPO versions of RESCHED trained on small synthetic
+instancesremaincompetitivewiththebestDANIELconfiguration. Specifically,theREINFORCE-
+based RESCHED requiresapproximately30minutestotrainontheSD
+1
+-10×5instances,whilethe
+PPO-based version trains in about 20 minutes. In comparison, HGNN (Song et al., 2023) and
+DANIEL (Wangetal.,2024b)requireabout21minutesand18minutes,respectively,tocomplete
+thesametraining. Thisindicatesthat,withonlyasmallamountoftrainingdataandashorttraining
+time,currentDRL-basedmethodsalreadyreachareasonablystronglevelonreal-worldscheduling
+benchmarks,highlightingtheirpracticalpotentialforrealschedulingapplications.
+24
+
+--- PAGE 25 ---
+PublishedasaconferencepaperatICLR2026
+In-distribution performance under a large training budget. Under the large-budget set-
+ting, both RESCHED versions benefit from the increased data: the average gap of RESCHED-
+REINFORCE drops from 14.35% to 10.30%, and RESCHED-PPO further improves it to 9.02%.
+RESCHED-PPO consistently improves over the REINFORCE version across almost all datasets.
+DANIELalsobenefitsfromthelargerbudget,yeteventheREINFORCEversionofRESCHEDnow
+clearly outperforms DANIEL on most SD
+2
+and medium-sized SD
+1
+instances, and the RESCHED-
+PPO achieves the best average in-distribution performance overall. This shows that, even when
+DANIEL is given a comparable large training budget, the proposed architecture (especially with
+PPO)remainssubstantiallystronger.
+Out-of-distributionperformanceunderalargetrainingbudget. Intheout-of-distributionset-
+tingwithalargetrainingbudget,bothRESCHEDversionsclearlyoutperformDANIELonaverage,
+andthePPOversionconsistentlyimprovesovertheREINFORCEversionacrossmostdatasets.
+Interestingly, when we increase the training budget of DANIEL by 25×, its OOD performance on
+the SD datasets does not improve and even degrades compared to the original setting. This sug-
+2
+geststhat, underthecurrenttrainingsetup, DANIELdoesnotclearlybenefitfromadditionaldata,
+which may partly explain why the original work chose a relatively small training budget. In con-
+trast, RESCHED continues to improve when the training budget is increased, indicating that our
+architecturecaneffectivelyleveragemoretrajectories.
+Open benchmark performance under a large training budget. On the open benchmark, all
+DRL-based methods achieve very similar performance under the large training budget, with only
+minor differences in gaps. RESCHED (both REINFORCE and PPO) remains competitive with
+DANIEL, indicating that models trained on synthetic SD instances transfer reasonably well to
+1
+theseopenbenchmarkanddonotexhibitnoticeableoverfittingtothesyntheticdistribution.
+These new experiments show that our architecture works well with both REINFORCE and PPO:
+the PPO version converges faster and further improves in-distribution and out-of-distribution per-
+formance,whiletheREINFORCEversionalreadyremainscompetitiveorbetterthanDANIELun-
+dermatchedbudgets. Inparticular,replacingREINFORCEwiththestrongerPPOalgorithm
+further improves RESCHED’s performance, demonstrating that our framework can directly
+benefitfromstrongerRLalgorithms. Overall,acrossallbudgetsandRLalgorithms, RESCHED
+consistentlymatchesoroutperformsDANIEL,indicatingthatthebenefitscomefromourframework
+ratherthanfromthelargeamountoftrainingdata.
+F ADDITIONAL ABLATIONS AND DESIGN CHOICES OF RESCHED
+Reward Design In our early framework explorations, we tested three different reward formula-
+tions: ∆-makespan(thechangeinmakespanbeforeandaftertakinganaction),estimatedmeanre-
+wardSongetal.(2023),andestimatedlower-boundrewardZhangetal.(2020);Wangetal.(2024b).
+As summarized in Table 12, all three variants are able to train a reasonable policy, but the choice
+ofrewardhasanoticeableimpactongeneralization. Inparticular,thedelta-makespanrewardtends
+to fit the synthetic distribution more aggressively: it can slightly improve average performance on
+synthetic OOD instances, but it significantly degrades performance on the open benchmarks com-
+paredtotheestimatedlower-boundreward, whichweinterpretasaformofoverfittingtothesyn-
+thetictrainingdistribution. Astheestimatedlower-boundrewardiscommonlyusedinDRLbased
+schedulingmethodslikeL2D(Zhangetal.,2020)andDANIEL(Wangetal.,2024b),wealsouseit
+toalignwiththestandardpractice.
+DiscountFactorγ Weinitiallysetthediscountfactortoγ = 0.99, followingstandarddeepRL
+practices. To investigate the impact of this hyperparameter, we also performed additional experi-
+mentswithγ = 1.0. Theresults,summarizedinTable13,showthatourmethodisnotsensitiveto
+thishyperparameterchoice,andwehavemaintainedγ =0.99inourmainconfiguration.
+25
+
+--- PAGE 26 ---
+PublishedasaconferencepaperatICLR2026
+Table12: EffectofdifferentrewardontheperformanceofRESCHED.
+Dataset EstLB EstMean ∆-Makespan
+In-distribution
+SD1-10×05 12.25 12.56 13.05
+Out-of-distribution
+SD1-30×10 3.44 3.29 3.30
+SD1-40×10 2.54 2.15 2.41
+SD2-30×10 8.79 9.19 7.53
+SD2-40×10 -2.40 -2.57 -4.30
+Avg. 3.09 3.015 2.24
+OpenBenchmark
+Brandimarte 9.08 9.66 15.35
+Hurink(edata) 15.48 16.58 17.27
+Hurink(rdata) 10.18 10.34 11.62
+Hurink(vdata) 3.48 2.75 4.50
+Avg. 9.56 9.83 12.19
+Table13: Effectofthediscountfactorγ ontheperformanceofRESCHED.
+Dataset RESCHED-0.99-Avg. RESCHED-1.0-Avg. RESCHED-1.0-seed1 RESCHED-1.0-seed2 RESCHED-1.0-seed3
+In-distribution
+SD1-10×05 11.75 11.75 11.41 11.76 12.07
+Out-of-distribution
+SD1-30×10 3.10 3.10 2.63 3.69 2.97
+SD1-40×10 2.23 2.19 2.00 2.51 2.06
+SD2-30×10 9.04 10.03 8.28 11.58 10.22
+SD2-40×10 -2.61 -2.09 -3.55 -0.11 -2.61
+Avg. 2.94 3.31 2.34 4.42 3.16
+OpenBenchmark
+Brandimarte 10.28 11.52 12.44 10.32 11.80
+Hurink(edata) 15.84 16.26 16.03 16.89 15.85
+Hurink(rdata) 10.13 10.50 10.49 10.11 10.91
+Hurink(vdata) 2.90 2.67 2.66 2.37 2.98
+Avg. 9.78 10.24 10.41 9.92 10.39
+Valuesareaverageoptimalitygaps(%)w.r.t.thebest-knownupperbounds.
+”-Avg.”denoteaveragesoverfourandthreeseeds,respectively.
+G FREQUENTLY ASKED QUESTIONS
+G.1 RESCHEDEXCELONFJSPBUTARELESSCOMPETITIVEONRECENTJSPBASELINES.
+WHATSTRUCTURALORDISTRIBUTIONALDIFFERENCESMAKEJSSPHARDERFOR
+RESCHED?
+AstheinstancedistributionofFJSPmovesclosertoapureJSSP(onefeasiblemachineperopera-
+tion),therelativeadvantageofFJSP-orientedDRLmethodsbecomessmaller. Thisphenomenonis
+not specificto RESCHED; italso appearson existing FJSPbaselines. For example, on theHurink
+benchmarksforFJSP,edatahasonaverageonly1.15feasiblemachinesperoperation(verycloseto
+JSSP),whereasrdatahas2andvdatahasabout(m/2)machinesperoperation.AsshowninTable14,
+allthreeFJSPmethods(HGNN,DANIEL,andRESCHED)performworstonedataandimproveas
+theflexibilityincreasesfromedata→rdata→vdata.
+BeyondtheempiricaltrendobservedontheHurinkdataset,wewouldliketohighlightastructural
+reason for this behavior. Methods for the Flexible JSP (FJSP), including our own, are explicitly
+designedtomodeltheinteractionsbetweenoperationsandmachines. Ourarchitecture,forinstance,
+incorporates a dedicated O2M branch and machine nodes, whose primary function is to resolve
+assignmentsamongmultiplefeasiblemachinesandbalancetheirloads.
+In strict JSP instances, however, this flexibility is absent, as each operation is assigned to a single
+feasiblemachine. Consequently,theO2Mdecisionstructurebecomeslesscritical,andaportionof
+the model’s dedicated capacity is consequently less informative. The challenge in these instances
+26
+
+--- PAGE 27 ---
+PublishedasaconferencepaperatICLR2026
+Table14: PerfprmancedegradationanalysisforRLapproaches.
+Dataset Avg.machines/oper HGNN10×5 DANIEL10×5 ReSched10×5
+Hurink(edata) 1.15 15.53 16.33 15.48
+Hurink(rdata) 2 11.15 11.42 10.18
+Hurink(vdata) m/2 4.25 3.28 3.48
+shifts predominantly to resolving fine-grained sequencing conflicts along predetermined machine
+routes.
+In contrast, many recent JSP-tailored methods simplify the representation by pooling machine-
+related information into aggregated operation features, effectively modeling the problem on an
+operation-onlygraph(Lee&Kim,2024;Zhangetal.,2020;Parketal.,2021b;Chenetal.,2023;
+Parketal.,2021a;Iklassovetal.,2023). Thisabstractioncanenablethemodeltoconcentratemore
+directlyonresolvingsequencingconflictswithinafixeddisjunctivegraph,whichmayyieldstronger
+performanceonclassicJSPbenchmarks.
+However,wepositthatinpracticalmanufacturingsettings,anoperationisintrinsicallylinkedtoits
+machineresources, asembodiedbyattributeslikemachine-specificprocessingtimes. Thisiswhy
+ourframeworkintentionallymaintainsdistinctoperationandmachinenodeswithexplicitO2Oand
+O2Medges. Thisarchitecturalchoicenecessarilytradesoffsomedegreeofshort-term,JSP-specific
+optimalitytoachieveamoregeneralizable,faithful,andextensiblemodel.Itisspecificallydesigned
+toaccommodateFJSPandothercomplexvariantswheremachineflexibilityandricherprecedence
+structuresarefundamentaltotheproblem.
+G.2 THEFJSP,JSSP,ANDFFSPREPRESENTRELATIVELYLIMITEDANDLESSCOMPLEX
+SCHEDULINGPROBLEMS. HOWCOULDTHISAPPROACHBEEXTENDEDTOHANDLEA
+BROADERRANGEOFSCHEDULINGPROBLEMS,INCLUDINGTHOSEWITHMOREDIVERSE
+ANDREALISTICCONSTRAINTSENCOUNTEREDINREAL-WORLDAPPLICATIONS?
+The goal of RESCHED is precisely to build a simple and generic framework that can be quickly
+adaptedtodifferentschedulingorresource-allocationscenarios.Tothisend,westartfromFJSPasa
+genericformulation,viewotherclassicshceudlingproblems(JSSP,FFSP)throughaheterogeneous
+operation–machinegraph,anddeliberatelyavoidproblem-specificfeaturesorheuristicsinboththe
+state representation and the network architecture. This is why the same model can already handle
+FJSP,JSSP,andFFSPwithoutanyarchitecturalchanges.
+As a concrete example, dependent task offloading in mobile edge computing (Wang et al., 2022;
+Xiao et al., 2025; Wang et al., 2020) can be viewed as an instance of our formulation. In this
+problem,anapplicationismodeledasaDAGofcomputationtaskswithprecedenceconstraints,and
+the scheduler must decide for each ready task whether to execute it locally or offload it to one of
+severalheterogeneousedge/cloudservers,subjecttocommunicationandresourcelimits,inorderto
+minimizeend-to-endlatency(oralatency–energytrade-off).
+Inthiscase,eachcomputationtaskinDAGcorrespondstoanoperationnode,andeachlocaldevice,
+edgeserver,orcloudnodecorrespondstoamachinenode. TaskdependenciesformtheO2Oedges,
+whiletheend-to-endlatencyforexecutingataskonagivenresource(communicationpluscompu-
+tation, orpurelycomputationforlocalexecution)definestheO2Medgedurations, withinfeasible
+assignmentsmaskedout. Underthismapping,thetaskDAGisdirectlyrepresentedastheO2Ocon-
+nectionmaskfedintotheoperationbranch,sonoarchitecturalchangeisrequired. Thescheduler’s
+decisionateachstepistoselectafeasibletask–resourcepair,andtheobjectiveistypicallyafunction
+oftaskcompletiontimessuchastotallatencyoralatency–energytrade-off.Ourstaterepresentation
+anddual-branchTransformercanthusbereusedwithoutmodification;onlythedurationmodeland
+rewarddefinitionneedtobeadapted,illustratinghow RESCHED canbeextendedtomorerealistic
+schedulingscenarios.
+H STATEMENT ON THE USE OF LARGE LANGUAGE MODELS (LLMS)
+Weusedlargelanguagemodels(e.g.,ChatGPT)asageneral-purposeassistantforlanguagepolish-
+ing(grammar,wording,clarity)andforsuggestingoccasionalnon-substantivecodesnippets.LLMs
+27
+
+--- PAGE 28 ---
+PublishedasaconferencepaperatICLR2026
+were not used for problem formulation, algorithm/model design, experimental design or analysis,
+datageneration,ordrawingconclusions. Allcorecodeandtechnicalcontentwereimplementedand
+verifiedbyus. WereviewedandeditedallLLM-assistedtextandcode,andtakefullresponsibility
+foreverypartofthemanuscript,includingsectionsthatbenefitedfromLLMassistance.
+28

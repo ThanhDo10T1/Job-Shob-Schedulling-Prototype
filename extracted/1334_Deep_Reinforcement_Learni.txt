@@ -1,0 +1,1291 @@
+
+--- PAGE 1 ---
+PublishedasaconferencepaperatICLR2024
+DEEP REINFORCEMENT LEARNING GUIDED IM-
+PROVEMENT HEURISTIC FOR JOB SHOP SCHEDULING
+CongZhang1,ZhiguangCao2,WenSong3,∗, YaoxinWu4&JieZhang1
+1NanyangTechnologicalUniversity,Singapore
+2SingaporeManagementUniversity,Singapore
+3InstituteofMarineScienceandTechnology,ShandongUniversity,China
+4DepartmentofIndustrialEngineering&InnovationSciences,EindhovenUniversityofTechnology
+cong030@e.ntu.edu.sg, yzgcao@smu.edu.sg, wensong@email.sdu.edu.cn
+y.wu2@tue.nl, jzhang@ntu.edu.sg
+ABSTRACT
+Recent studies in using deep reinforcement learning (DRL) to solve Job-shop
+schedulingproblems(JSSP)focusonconstructionheuristics. However,theirper-
+formanceisstillfarfromoptimality,mainlybecausetheunderlyinggraphrepre-
+sentationschemeisunsuitableformodellingpartialsolutionsateachconstruction
+step. ThispaperproposesanovelDRL-guidedimprovementheuristicforsolving
+JSSP,wheregraphrepresentationisemployedtoencodecompletesolutions. We
+design a Graph-Neural-Network-based representation scheme, consisting of two
+modulestoeffectivelycapturetheinformationofdynamictopologyanddifferent
+typesofnodesingraphsencounteredduringtheimprovementprocess. Tospeed
+upsolutionevaluationduringimprovement, wepresentanovelmessage-passing
+mechanismthatcanevaluatemultiplesolutionssimultaneously. Weprovethatthe
+computational complexity of our method scales linearly with problem size. Ex-
+periments on classic benchmarks show that the improvement policy learned by
+ourmethodoutperformsstate-of-the-artDRL-basedmethodsbyalargemargin.
+1 INTRODUCTION
+Recently, there has been a growing trend towards applying deep (reinforcement) learning (DRL)
+to solve combinatorial optimization problems (Bengio et al., 2020). Unlike routing problems that
+are vastly studied (Kool et al., 2018; Xin et al., 2021a; Hottung et al., 2022; Kwon et al., 2020;
+Ma et al., 2023; Zhou et al., 2023; Xin et al., 2021b), the Job-shop scheduling problem (JSSP), a
+well-known problem in operations research ubiquitous in many industries such as manufacturing
+andtransportation,receivedrelativelylessattention.
+Compared to routing problems, the performance of existing learning-based solvers for scheduling
+problemsisstillquitefarfromoptimalityduetothelackofaneffectivelearningframeworkandneu-
+ralrepresentationscheme. ForJSSP,mostexistinglearning-basedapproachesfollowadispatching
+procedurethatconstructsschedulesbyextendingpartialsolutionstocompleteones.Torepresentthe
+constructivestates,i.e. partialsolutions,theyusuallyemploydisjunctivegraph(Zhangetal.,2020;
+Park et al., 2021b) or augment the graph with artificial machine nodes (Park et al., 2021a). Then,
+a Graph Neural Network (GNN) based agent learns a latent embedding of the graphs and outputs
+construction actions. However, such representation may not be suitable for learning construction
+heuristics. Specifically,whiletheagentrequiresproperwork-in-progressinformationofthepartial
+solution during each construction step (e.g. the current machine load and job status), it is hard to
+incorporate them into a disjunctive graph, given that the topological relationships could be more
+naturallymodelledamongoperations1(Balas,1969). Consequently,withtheimportantcomponents
+beingignoredduetothesolutionincompleteness,suchasthedisjunctivearcsamongundispatched
+operations (Zhang et al., 2020) and the orientations of disjunctive arcs among operations within
+a machine clique (Park et al., 2021b), the partial solution representation by disjunctive graphs in
+∗correspondingauthor
+1PleaserefertoAppendixKforadetaileddiscussion
+1
+
+--- PAGE 2 ---
+PublishedasaconferencepaperatICLR2024
+current works may suffer from severe biases. Therefore, one question that comes to mind is: Can
+we transform the learning-to-schedule problem into a learning-to-search-graph-structures problem
+tocircumventtheissueofpartialsolutionrepresentationandsignificantlyimproveperformance?
+Comparedtoconstructionones,improvementheuristicsperformiterativesearchintheneighbour-
+hood for better solutions. For JSSP, a neighbour is a complete solution, which is naturally repre-
+sented as a disjunctive graph with all the necessary information. Since searching over the space
+of disjunctive graphs is more effective and efficient, it motivates a series of breakthroughs in tra-
+ditional heuristic methods (Nowicki & Smutnicki, 2005; Zhang et al., 2007). In traditional JSSP
+improvement heuristics, local moves in the neighbourhood are guided by hand-crafted rules, e.g.
+pickingtheonewiththelargestimprovement. Thisinevitablybringstwomajorlimitations. Firstly,
+ateachimprovementstep,solutionsinthewholeneighbourhoodneedtobeevaluated,whichiscom-
+putationally heavy, especially for large-scale problems. Secondly, the hand-crafted rules are often
+short-sighted and may not take future effects into account, therefore could limit the improvement
+performance.
+In this paper, we propose a novel DRL-based improvement heuristic for JSSP that addresses the
+above limitations, based on a simple yet effective improvement framework. The local moves are
+generatedbyadeeppolicynetwork, whichcircumventstheneedtoevaluatetheentireneighbour-
+hood. More importantly, through reinforcement learning, the agent is able to automatically learn
+searchpoliciesthatarelonger-sighted,leadingtosuperiorperformance. Whileasimilarparadigm
+has been explored for routing problems (Chen & Tian, 2019; Lu et al., 2019; Wu et al., 2021), it
+is rarely touched in the scheduling domain. Based on the properties of JSSP, we propose a novel
+GNN-based representation scheme to capture the complex dynamics of disjunctive graphs in the
+improvementprocess,whichisequippedwithtwoembeddingmodules. Onemoduleisresponsible
+forextractingtopologicalinformationofdisjunctivegraph,whiletheotherextractsembeddingsby
+incorporatingtheheterogeneityofnodes’neighboursinthegraph. Theresultingpolicyhaslinear
+computational complexity with respect to the number of jobs and machines when embedding dis-
+junctivegraphs. Tofurtherspeedupsolutionevaluation,especiallyforbatchprocessing,wedesign
+anovelmessage-passingmechanismthatcanevaluatemultiplesolutionssimultaneously.
+We verify our method on seven classic benchmarks. Extensive results show that our method gen-
+erallyoutperformsstate-of-the-artDRL-basedmethodsbyalargemarginwhilemaintainingalow
+computational cost. On large-scale instances, our method even outperforms Or-tools CP-SAT, a
+highly efficient constraint programming solver. Our aim is to showcase the effectiveness of Deep
+ReinforcementLearning(DRL)inlearningsuperiorsearchcontrolpoliciescomparedtotraditional
+methods. OurcomputationallyefficientDRL-basedheuristicnarrowstheperformancegapwithex-
+istingtechniquesandoutperformsatabusearchalgorithminexperiments. Furthermore,ourmethod
+canpotentiallybecombinedwithmorecomplicatedimprovementframeworks,howeveritisoutof
+thescopeofthispaperandwillbeinvestigatedinthefuture.
+2 RELATED WORK
+Most existing DRL-based methods for JSSP focus on learning dispatching rules, or construction
+heuristics. Among them, L2D (Zhang et al., 2020) encodes partial solutions as disjunctive graphs
+andaGNN-basedagentistrainedviaDRLtodispatchjobstomachinestoconstructtightschedules.
+Despitethesuperioritytotraditionaldispatchingrules,itsgraphrepresentationcanonlycapturerela-
+tionsamongdispatchedoperations,resultinginrelativelylargeoptimalitygaps. Asimilarapproach
+isproposedin(Parketal.,2021b). Byincorporatingheterogeneityofneighbours(e.g. predecessor
+orsuccessor)indisjunctivegraphs,aGNNmodelextractsseparateembeddingsandthenaggregates
+themaccordingly. WhiledeliveringbettersolutionsthanL2D,thismethodsuffersfromstaticgraph
+representation, as the operations in each machine clique are always fully connected. Therefore, it
+fails to capture structural differences among solutions, which we notice to be critical. For exam-
+ple,givenaJSSPinstance,theprocessingorderofjobsoneachmachinecouldbedistinctforeach
+solution,whichcannotbereflectedcorrectlyintherespectiverepresentationscheme. ScheduleNet
+(Parketal.,2021a)introducesartificialmachinenodesandedgesinthedisjunctivegraphtoencode
+machine-jobrelations. Thenewgraphenrichestheexpressivenessbutisstillstatic. AMarkovde-
+cision process formulation with a matrix state representation is proposed in (Tassel et al., 2021).
+Though the performance is ameliorated, it is an online method that learns for each instance sepa-
+rately,hencerequiringmuchlongersolvingtime.Moreover,unliketheaforementionedgraph-based
+ones, the matrix representation in this method is not size-agnostic, which cannot be generalised
+2
+
+--- PAGE 3 ---
+PublishedasaconferencepaperatICLR2024
+acrossdifferentproblemsizes. RASCL(Iklassovetal.,2022)learnsgeneralizeddispatchingrules
+forsolvingJSSP,wherethesolvingprocessismodelledasMDPs. Tasseletal.(2023a)proposeto
+leverageexistingConstraintProgramming(CP)solverstotrainaDRL-agentlearningaPriorityDis-
+patchingRule(PDR)thatgeneralizeswelltolargeinstances. Despitesubstantialimprovement,the
+performanceoftheseworksisstillfarfromoptimalitycomparedwithourmethod. Otherlearning-
+based construction heuristics for solving variants of JSSP include FFSP (Choo et al., 2022; Kwon
+etal.,2021)andschedulingproblemsinsemiconductormanufacturing(Tasseletal.,2023b). How-
+ever,thesemethodsareincompatiblewithJSSPduetotheirunderlyingassumptionofindependent
+machinesetsforeachprocessingstage,whichcontradictsthesharedmachineconfigurationinherent
+inJSSP.
+AworksimilartooursisMGRO(Nietal.,2021),whichlearnsapolicytoaidIteratedGreedy(IG),
+an improvement heuristic, to solve the hybrid flow shop scheduling problem. Our method differs
+from it in two aspects. Firstly, unlike MGRO which learns to pick local operators from a pool of
+manually designed ones, our policy does not require such manual work and directly outputs local
+moves. Secondly,MGROencodesthecurrentsolutionasmultipleindependentsubgraphs,whichis
+notapplicabletoJSSPsinceitcannotmodelprecedenceconstraints.
+3 PRELIMINARIES
+Job-shopScheduling. AJSSPinstanceofsize|J|×|M|consistsof|J|jobsand|M|machines.
+Eachjobj ∈J isrequiredtobeprocessedbyeachmachinem∈MinapredefinedorderOmj1 →
+j1
+··· → Omji → ··· → O mj|M| with Omji denoting the ith operation of job j, which should be
+ji j|M| ji
+processed by the machine m with processing time p ∈ N. Let O be the collections of all
+ji ji j
+operations for job j. Only can the operation Omji be processed when all its precedent operations
+ji
+{Omjz|z < i} ⊂ O areprocessed,whichistheso-calledprecedenceconstraint. Theobjectiveis
+jz j
+to find a schedule η : {Omji|∀j,i} → N, i.e., the starting time for each operation, such that the
+ji
+makespanC =max(η(Omji)+p )isminimumwithoutviolatingtheprecedenceconstraints.
+max ji ji
+Toenhancesuccinctness,thenotationm indicatingthemachineallocationforoperationO will
+ji ji
+bedisregardedasmachineassignmentsforoperationsremainconstantthroughoutanygivenJSSP
+instance. Thisnotationwillbereinstatedonlyifitsspecificationiscritical.
+Disjunctive Graph. The disjunctive graph (Balas, 1969) is a directed graph G = (O,C ∪ D),
+whereO ={O |∀j,i}∪{O ,O }isthesetofalloperations,withO andO beingthedummy
+ji S T S T
+onesdenotingthebeginningandendofprocessing. C consistsofdirectedarcs(conjunctions)rep-
+resentingtheprecedenceconstraintsconnectingeverytwoconsecutiveoperationsofthesamejob.
+Undirected arcs (disjunctions) in set D connect operations requiring the same machine, forming
+a clique for each machine. Each arc is labelled with a weight, which is the processing time of
+the operation that the arc points from (two opposite-directed arcs can represent a disjunctive arc).
+Consequently, finding a solution s to a JSSP instance is equivalent to fixing the direction of each
+disjunction,suchthattheresultinggraphG(s)isaDAG(Balas,1969). ThelongestpathfromO
+S
+to O in a solution is called the critical path (CP), whose length is the makespan of the solution.
+T
+An example of disjunctive graph for a JSSP instance and its solution are depicted in Figure 1.
+The N neighbourhood Structure. Various
+5
+neighbourhood structures have been proposed
+forJSSP(Zhangetal.,2007). Hereweemploy
+thewell-knownN designedbasedonthecon-
+5
+ceptofcriticalblock(CB),i.e. agroupofcon- Critical
+secutiveoperationsprocessedbythesamema- blocks
+chineon thecriticalpath (referto Figure1for
+anexample). Givenasolutions,N constructs Figure 1: Disjunctive graph representation.
+5
+the neighbourhood N (s) as follows. First, it Left:a3×3JSSPinstance.Blackarrowsarecon-
+5
+findsthecriticalpathCP(s)ofG(s)(randomly junctions. Dottedlinesofdifferentcolorsaredis-
+selects one if more than one exist). Then for junctions, grouping operations on each machine
+each CB = Om → Om → ··· → Om → intomachinecliques. Right: acompletesolution,
+m 1 2 l
+··· → Om → Om with m and 1 ≤ l ≤ L whereacriticalpathandacriticalblockarehigh-
+L−1 L l
+denotingtheprocessingmachineandtheindex lighted. Arcweightsareomittedforclarity.
+ofoperationO alongthecriticalpathCP(s),at
+l
+3
+
+--- PAGE 4 ---
+PublishedasaconferencepaperatICLR2024
+Initial Solution Best Solution Input
+Start Yes
+Graph Select Make Changes to
+Representation Operation Pairs Current Solution Terminal Criterion Output
+No
+(a) Theoverallframeworkofourmethod. (b) Statetransitionexample.
+Figure2:Ourlocalsearchframeworkandanexampleofstatetransition.InFigure(b),thestate
+s istransitedtos byswappingoperationO andO . Anewcriticalpathwithitstwocritical
+t t+1 22 31
+blocksisgeneratedandhighlightedins .
+t+1
+mosttwoneighboursareobtainedbyswappingthefirst(Om1,Om2)orlastpair(OmL−1,OmL)of
+1 2 L−1 L
+operations. Only one neighbour exists if a CB has only two operations. For the first and last CB,
+onlythelastandfirstoperationpairareswapped. Consequently,theneighbourhoodsize|N (s)|is
+5
+atmost2N(s)−2withN(s)beingthenumberofCBsinG(s).
+4 METHODOLOGY
+TheoverallframeworkofourimprovementmethodisshowninFigure2(a). Theinitialsolutionis
+generatedbybasicdispatchingrules.Duringtheimprovementprocess,solutionsareproxiedbytheir
+graphical counterpart, i.e. disjunctive graphs. Different from traditional improvement heuristics
+which need to evaluate all neighbours at each step, our method directly outputs an operation pair,
+which is used to update the current solution according to N . The process terminates if certain
+5
+conditionismet. HerewesetitasreachingasearchinghorizonofT steps.
+BelowwepresentourDRL-basedmethodforlearningthepairpickingpolicy.Wefirstformulatethe
+learningtaskasaMarkovdecisionprocess(MDP).Thenweshowhowtoparameterizethepolicy
+based on GNN, and design a customized REINFORCE (Williams, 1992) algorithm to train the
+policynetwork. Finally,wedesignamessage-passingmechanismtoquicklycalculatetheschedule,
+whichsignificantlyimprovesefficiencyespeciallyforbatchtraining. Notethat,theproposedpolicy
+possesseslinearcomputationalcomplexityw.r.t. thenumberofjobs|J|andmachines|M|.
+4.1 THESEARCHINGPROCEDUREASANMDP
+States. A state s ∈ S is the complete solution at step t, with s being the initial one. Each
+t 0
+state is represented as its disjunctive graph. Features of each node O is collected in a vector
+ji
+x = (p ,est ,lst ) ∈ R3,whereest andlst aretheearliestandlateststartingtimeofO ,
+ji ji ji ji ji ji ji
+respectively. Foracompletesolution,est(O )istheactualstarttimeofO intheschedule. IfO
+ji ji ji
+islocatedonacriticalpath,thenest =lst (Jungnickel&Jungnickel,2005). Thisshouldbeable
+ji ji
+tohelptheagentdistinguishwhetheranodeisonthecriticalpath.
+Actions. Sinceweaimatselectingasolutionwithintheneighbourhood,anactiona isoneofthe
+t
+operationpairs(O ,O )inthesetofallcandidatepairsdefinedbyN . Notethattheactionspace
+ji kl 5
+A isdynamicw.r.teachstate.
+t
+Transition. Thenextstates isderiveddeterministicallyfroms byswappingthetwooperations
+t+1 t
+ofactiona =(O ,O )inthegraph. AnexampleisillustratedinFigure2(b),wherefeaturesest
+t ji kl
+andlstarerecalculatedforeachnodeins . Ifthereisnofeasibleactiona forsomet,e.g. there
+t+1 t
+is only one critical block in s , then the episode enters an absorbing state and stays within it. We
+t
+presentaexampleinAppendixJtofacilitatebetterunderstandingthestatetransitionmechanism.
+Rewards. Ourultimategoalistoimprovetheinitialsolutionasmuchaspossible. Tothisend,we
+designtherewardfunctionasfollows:
+r(s ,a )=max(C (s∗)−C (s ),0), (1)
+t t max t max t+1
+where s∗ is the best solution found until step t (the incumbent), which is updated only if s
+t t+1
+is better, i.e. C (s ) < C (s∗). Initially, s∗ = s . The cumulative reward until t is
+max t+1 max t 0 0
+R = (cid:80)t r(s ,a )=C (s )−C (s∗),whichisexactlytheimprovementagainstinitial
+t t′=0 t′ t′ max 0 max t
+4
+
+--- PAGE 5 ---
+PublishedasaconferencepaperatICLR2024
+Curre I n n t p S u o t l : ution Topological E f m ro N b m e o d d T d e P i M ng M E e m rg b e e d d d N in o g d e Ea S c N h c o o C d r e e a s n P d F a i o i d r r ate Ne O w u S t o p l u ut t i : on
+Embedding
+Module (TPM) Em G b r e a d p d h ing Sampled
+fro G m ra T p P h M Concatenate Se A l c e t c i t o i n on So L f a t y M er ax Node Pair
+Context-Aware Embedding Network
+Embedding from CAM
+Module (CAM) E fr m o N b m e o d d C d e A in M g M E e m rg b e e d d G d r in a g ph E P a r c o N h b o a C d b e a i l n P it d y a i i d F r a o t r e
+Figure3: Thearchitectureofourpolicynetwork.
+solutions . Whentheepisodeenterstheabsorbingstate,bydefinition,therewardisalways0since
+0
+thereisnopossibilityofimprovingtheincumbentfromthenon.
+Policy. Forstates ,astochasticpolicyπ(a |s )outputsadistributionovertheactionsinA . Ifthe
+t t t t
+episodeenterstheabsorbingstate,thepolicywilloutputadummyactionwhichhasnoeffect.
+4.2 POLICYMODULE
+Weparameterizethestochasticpolicyπ (a |s )asaGNN-basedarchitecturewithparametersetθ.
+θ t t
+AGNNmapsthegraphtoacontinuousvectorspace. Theembeddingsofnodescouldbedeemed
+asfeaturevectorscontainingsufficientinformationtobereadilyusedforvariousdownstreamtasks,
+suchasselectingoperationpairsforlocalmovesinourcase. Moreover,aGNN-basedpolicyisable
+to generalize to instances of various sizes that are unseen during training, due to its size-agnostic
+property. ThearchitectureofourpolicynetworkisshowninFigure3.
+4.2.1 GRAPHEMBEDDING
+Forthedisjunctivegraph,wedefineanodeU asaneighbourofnodeV ifanarcpointsfromU to
+V. Therefore,thedummyoperationO hasnoneighbours(sincetherearenonodespointingtoit),
+S
+and O has |J| neighbours (since every job’s last operation is pointing to it). There are two no-
+T
+tablecharacteristicsofthisgraph. First,thetopologyisdynamicallychangingduetotheMDPstate
+transitions. Suchtopologicaldifferenceprovidesrichinformationfordistinguishingtwosolutions
+from the structural perspective. Second, most operations in the graph have two different types of
+neighbours, i.e. itsjobpredecessorandmachinepredecessor. Thesetwotypesofneighbourshold
+respective semantics. The former is closely related to the precedence constraints, while the latter
+reflects the processing sequence of jobs on each machine. Based on this observation, we propose
+a novel GNN with two independent modules to embed disjunctive graphs effectively. We will ex-
+perimentallyprovebyanablationstudy(AppendixM)thatthecombinationofthetwomodulesare
+indeedmoreeffective.
+TopologicalEmbeddingModule. Fortwodifferentsolutions,theremustexistamachineonwhich
+jobs are processed in different orders, i.e. the disjunctive graphs are topologically different. The
+first module, which we call topological embedding module (TPM), is expected to capture such
+structural differences, so as to help the policy network distinguish different states. To this end,
+weexploitGraphIsomorphismNetwork(GIN)(Xuetal.,2019), awell-knownGNNvariantwith
+strong discriminative power for non-isomorphic graphs as the basis of TPM. Given a disjunctive
+graphG,TPMperformsK iterationsofupdatestocomputeap-dimensionalembeddingsforeach
+nodeV ∈O,andtheupdateatiterationkisexpressedasfollows:
+(cid:88)
+µk =MLPk((1+ϵk)µk−1+ µk−1), (2)
+V T V U
+U∈N(V)
+whereµk isthetopologicalembeddingofnodeV atiterationk andµ0 = x isitsrawfeatures,
+V V ji
+MLPk is a Multi-Layer Perceptron (MLP) for iteration k, ϵk is an arbitrary number that can be
+T
+learned,andN(V)istheneighbourhoodofV inG. Foreachk,weattainagraph-levelembedding
+µk ∈RpbyanaveragepoolingfunctionLwithembeddingsofallnodesasinputasfollows:
+G
+1 (cid:88)
+µk =L({µk :V ∈O})= µk. (3)
+G V |O| V
+V∈O
+5
+
+--- PAGE 6 ---
+PublishedasaconferencepaperatICLR2024
+Finally, the topological embeddings of each
+node and the disjunctive graph after the K it-
+erations are {µ = (cid:80) µk : ∀V ∈ O} and
+V k V
+µ = (cid:80) µk,respectively. Forrepresentation
+G k G
+learning with GIN, layers of different depths
+Figure4: ExampleofG andG .
+learndifferentstructuralinformation(Xuetal., J M
+2019). The representations acquired by the shallow layers sometimes generalize better, while the
+deeper layers are more oriented for the target task. To consider all the discrepant structural infor-
+mation of the disjunctive graph and align the hidden dimension, we sum the embeddings from all
+layers.
+Context-aware Embedding Module. Now we present the second module to capture information
+fromthetwotypesofneighbouringnodes,whichwecallcontext-awareembeddingmodule(CAM).
+Specifically, we separate a disjunctive graph G into two subgraphs G and G , i.e. contexts, as
+J M
+showninFigure4. BothsubgraphscontainallnodesofG,buthavedifferentsetsofedgestoreflect
+respectiveinformation. G containsonlyconjunctivearcswhichrepresentprecedenceconstraints,
+J
+while G contains only (directed) disjunctive arcs to represent the job processing order on each
+M
+machine. Note that the two dummy nodes O and O are isolated in G , since they are not
+S T M
+involvedinanymachine.
+Similar to TPM, CAM also updates the embeddings for K iterations by explicitly considering the
+twocontextsduringmessagepassingandaggregation. Particularly,theupdateofnodeembeddings
+atCAMiterationkisgivenasfollows:
+νJ,k =GATk(cid:0) νk−1,{νk−1|U∈N (V)} (cid:1) , (4)
+V J V U J
+νM,k =GATk (cid:0) νk−1,{νk−1|U∈N (V)} (cid:1) , (5)
+V M V U M
+1(cid:16) (cid:17)
+νk = νJ,k+νM,k , (6)
+V 2 V V
+whereGATk andGATk aretwographattentionlayers(Velicˇkovic´ etal.,2018)withn attention
+J M h
+heads,νk ∈Rpisthecontext-awareembeddingforV atlayerk,νJ,k ∈RpandνM,k ∈RpareV’s
+V V V
+embeddingforprecedenceconstraintsandjobprocessingsequence,andN (V)andN (V)areV’s
+J M
+neighbourhoodinG andG ,respectively. Forthefirstiteration,weinitializeν0 =x ,∀V ∈O.
+J M V ji
+Finally,wecomputethegraph-levelcontext-awareembeddingν usingaveragepoolingasfollows:
+G
+1 (cid:88)
+ν = νK. (7)
+G |O| V
+V∈O
+Togenerateaglobalrepresentationforthewholegraph,wemergethetopologicalandcontext-aware
+embeddingsbyconcatenatingthemandyield:
+{h =(µK :νK)|∀V ∈O},h =(µ :ν ). (8)
+V V V G G G
+Remark. We choose GIN as the building block for TPM mainly because it is one of the strongest
+GNN architectures with proven power to discriminate graphs from a topological point of view. It
+maybenefitidentifyingtopologicaldiscrepanciesbetweensolutions. AsforGAT,itisanequivalent
+counterpartofTransformers(Vaswanietal.,2017)forgraphs,whichisadominantarchitecturefor
+learningrepresentationsfromelementattributes. ThereforeweadoptGATasthebuildingblockof
+ourCAMmoduletoextractnodeembeddingsfortheheterogeneouscontexts.
+4.2.2 ACTIONSELECTION
+Giventhenodeembeddings{h }andgraphembeddingh , wecomputethe“score”ofselecting
+V G
+each operation pair as follows. First, we concatenate h to each h , and feed it into a network
+G V
+MLP , to obtain a latent vector denoted as h′ with dimension q, which is collected as a matrix
+A V
+h′ with dimension |O|×q. Then we multiply h′ with its transpose h′T to get a matrix SC with
+dimension|O|×|O|asthescoreofpickingthecorrespondingoperationpair. Next,forallpairsthat
+arenotincludedinthecurrentactionspace,wemaskthembysettingtheirscoresto−∞. Finally,
+6
+
+--- PAGE 7 ---
+PublishedasaconferencepaperatICLR2024
+weflattenthescorematrixandapplyasoftmaxfunctiontoobtaintheprobabilityofselectingeach
+feasibleaction.
+Wepresentthetheoreticalcomputationalcomplexityoftheproposedpolicynetwork. Specifically,
+foraJSSPinstanceofsize|J|×|M|,wecanshowthat:
+Theorem4.1. Theproposedpolicynetworkhaslineartimecomplexityw.r.tboth|J|and|M|.
+ThedetailedproofispresentedinAppendixC.Intheexperiments, wewillalsoprovideempirical
+analysisandcomparisonwithotherbaselines.
+4.3 THEn-STEPREINFORCEALGORITHM
+We propose an n-step REINFORCE algorithm for training the policy network. The motivation,
+benefits,anddetailsofthisalgorithmarepresentedinAppendixA.
+4.4 MESSAGE-PASSINGFORCALCULATINGSCHEDULE
+The improvement process requires evaluating the quality of neighbouring solutions by calculating
+their schedules. In traditional scheduling methods, this is usually done by using the critical path
+method(CPM)(Jungnickel&Jungnickel,2005), whichcalculatesthestarttimeforeachnodere-
+cursively. However, it can only process a single graph and cannot make full use of the parallel
+computing power of GPU. Therefore, traditional CPM is time-costly in processing a batch of in-
+stances. Toalleviatethisissue,weproposeanequivalentvariantofthisalgorithmusingamessage-
+passingmechanismmotivatedbythecomputationofGNN,whichenablesbatchprocessingandis
+compatiblewithGPU.
+Our message-passing mechanism works as follows. Given a directed disjunctive graph G repre-
+senting a solution s, we maintain a message ms = (d ,c ) for each node V ∈ O, with initial
+V V V
+values d = 0 and c = 1, except c = 0 for V = O . Let mp (·) denote a message-
+V V V S max
+passingoperatorwithmax-poolingastheneighbourhoodaggregationfunction,basedonwhichwe
+performaseriesofmessageupdates. Duringeachofthem, forV ∈ O, weupdateitsmessageby
+d = mp ({p +(1−c )·d |∀U ∈N(V)}) and c = mp ({c |∀U ∈N(V)}) with
+V max U U U V max U
+p and N(V) being the processing time and the neighbourhood of V, respectively. Let H be the
+V
+numberofnodesonthepathfromO toO containingthemostnodes. Thenwecanshowthat:
+S T
+Theorem4.2. AfteratmostH timesofmessagepassing,d =est ,∀V ∈O,andd =C (s).
+V V T max
+TheproofispresentedinAppendixD.1. Thispropositionindicatesthatourmessage-passingeval-
+uatorisequivalenttoCPM.Itiseasytoprovethatthispropositionalsoholdsforabatchofgraphs.
+Thusthepracticalruntimeforcalculatingthescheduleusingourevaluatorissignificantlyreduced
+duetocomputationinparallelacrossthebatch. Weempiricallyverifytheeffectivenessbycompar-
+ingitwithCPM(AppendixD.3).
+Similarly,lst canbecalculatedbyabackwardversionofourmessage-passingevaluatorwherethe
+V
+messageispassedfromnodeO toO inagraphGwithalledgesreversed.EachnodeV maintains
+T S
+amessagems =(d¯ ,c¯ ).Theinitialvaluesared¯ =−1andc¯ =1,exceptd¯ =−C (s)and
+V V V V V T max
+c¯ =0forV =O .ThemessageofV isupdatedasd¯ =mp ({p +(1−c¯ )·d¯ |∀U∈N(V)})
+T T V max U U U
+andc¯ =mp ({c¯ |∀U∈N(V)}). Wecanshowthat:
+V max U
+Corollary4.3. AfteratmostH timesofmessagepassing,d¯ =−lst ,∀V ∈O,andd¯ =0.
+V V S
+The proof is presented in Appendix D.2. Please refer to an example in D.4 for the procedure of
+computingestusingtheproposedmessage-passingoperator.
+5 EXPERIMENTS
+5.1 EXPERIMENTALSETUP
+Datasets. Weperformtrainingonsyntheticinstancesgeneratedfollowingthewidelyusedconven-
+tionin(Taillard,1993). Weconsiderfiveproblemsizes,including10×10,15×10,15×15,20×10,
+and 20×15. For evaluation, we perform testing on seven widely used classic benchmarks unseen
+7
+
+--- PAGE 8 ---
+PublishedasaconferencepaperatICLR2024
+Table1: Performanceonclassicbenchmarks. “Gap”: theaveragegaptothebestsolutionsinthe
+literature. “Time”: theaveragetimeofsolvingasingleinstance(“s”,“m”,and“h”meansseconds,
+minutes,andhours,respectively.). Foreachproblemsize,resultsinboldandboldbluerepresentthe
+localandoverallbestresults,respectively.
+Taillard ABZ FT
+Method 15×15 20×15 20×20 30×15 30×20 50×15 50×20 100×20 10×10 20×15 6×6 10×10 20×5
+Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time GapTimeGap Time
+CP-SAT 0.1%7.7m0.2% 0.8h0.7% 1.0h2.1% 1.0h2.8% 1.0h0.0% 0.4h2.8% 0.9h3.9% 1.0h0.0% 0.8s1.0% 1.0h0.0% 0.1s0.0%4.1s0.0% 4.8s
+L2D 24.7% 0.4s30.0% 0.6s28.8% 1.1s30.5% 1.3s32.9% 1.5s20.0% 2.2s23.9% 3.6s12.9%28.2s14.8% 0.1s24.9% 0.6s14.5% 0.1s21.0%0.2s36.3% 0.2s
+RL-GNN 20.1% 3.0s24.9% 7.0s29.2%12.0s24.7%24.7s32.0%38.0s15.9%1.9m21.3%3.2m9.2%28.2m10.1% 0.5s29.0% 7.3s29.1% 0.1s22.8%0.5s14.8% 1.3s
+ScheduleNet15.3% 3.5s19.4% 6.6s17.2%11.0s19.1%17.1s23.7%28.3s13.9%52.5s13.5%1.6m6.7%7.4m6.1% 0.7s20.5% 6.6s7.3% 0.2s19.5%0.8s28.6% 1.6s
+GD-500 11.9%48.2s14.4%75.2s15.7%1.7m17.9%91.3s20.1%1.7m12.5%2.1m13.7%2.6m7.3%4.6m6.2%26.8s16.5%58.8s3.6%15.8s10.1%33.2s9.8%37.0s
+FI-500 12.3%70.6s15.7%87.4s14.5%2.2m18.4%1.9m22.0%3.0m14.2%2.5m15.6%4.3m9.3%7.4m3.5%33.8s16.7%85.4s0.0%18.2s10.1%42.4s16.1%40.7s
+BI-500 11.7%65.4s14.5%83.5s14.3%2.3m18.3%1.9m20.7%2.9m13.1%2.7m14.2%4.0m8.1%7.0m4.1%31.2s16.8%84.9s0.0%18.0s12.9%41.3s22.0%40.6s
+Ours-500 9.3% 9.3s11.6%10.1s12.4%10.9s14.7%12.7s17.5%14.0s11.0%16.2s13.0%22.8s7.9%50.2s2.8% 7.4s11.9%10.2s0.0% 6.8s9.9%7.5s6.1% 7.4s
+GD-5000 11.9%7.7m14.4%12.3m15.7%17.3m17.9%15.3m20.1%16.6m12.5%20.0m13.7%23.1m7.3%39.2m6.2%4.5m16.5%9.7m3.6%2.6m10.1%5.5m9.8%6.1m
+FI-5000 9.8%12.6m13.0%15.8m13.3%24.2m15.0%20.2m17.5%30.6m10.5%27.4m11.8%44.5m6.4%76.2m2.7%5.9m13.3%15.3m0.0%3.0m5.6%7.3m6.9%6.9m
+BI-5000 10.5%11.9m11.8%15.6m12.0%23.6m14.4%19.6m16.9%28.8m9.2%27.5m10.9%43.4m5.4%76.4m2.1%5.7m10.9%15.0m0.0%3.1m6.2%7.1m6.6%7.0m
+Ours-1000 8.6%18.7s10.4%20.3s11.4%22.2s12.9%24.7s15.7%28.4s9.0%32.9s11.4%45.4s6.6%1.7m2.8%15.0s11.2%19.9s0.0%13.5s8.0%15.1s3.9%15.0s
+Ours-2000 7.1%37.7s9.4%41.5s10.2%44.7s11.0%49.1s14.0%56.8s6.9%65.7s9.3%90.9s5.1%3.4m2.8%30.1s9.5%39.3s0.0%27.2s5.7%30.0s1.5%29.9s
+Ours-5000 6.2%92.2s8.3%1.7m9.0%1.9m9.0%2.0m12.6%2.4m4.6%2.8m6.5%3.8m3.0%8.4m1.4%75.2s8.6%99.6s0.0%67.7s5.6%74.8s1.1%73.3s
+LA SWV ORB YN
+Method 10×5 15×5 20×5 10×10 15×10 20×10 30×10 15×15 20×10 20×15 50×10 10×10 20×20
+Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time GapTimeGap Time
+CP-SAT 0.0% 0.1s0.0% 0.2s0.0% 0.5s0.0% 0.4s0.0%21.0s0.0%12.9m0.0%13.7s0.0%30.1s0.1% 0.8h2.5% 1.0h1.6% 0.5h0.0%4.8s0.5% 1.0h
+L2D 14.3% 0.1s5.5% 0.1s4.2% 0.2s21.9% 0.1s24.6% 0.2s24.7% 0.4s8.4% 0.7s27.1% 0.4s41.4% 0.3s40.6% 0.6s30.8% 1.2s31.8%0.1s22.1% 0.9s
+RL-GNN 16.1% 0.2s1.1% 0.5s2.1% 1.2s17.1% 0.5s22.0% 1.5s27.3% 3.3s6.3%11.3s21.4% 2.8s28.4% 3.4s29.4% 7.2s16.8%51.5s21.8%0.5s24.8%11.0s
+ScheduleNet12.1% 0.6s2.7% 1.2s3.6% 1.9s11.9% 0.8s14.6% 2.0s15.7% 4.1s3.1% 9.3s16.1% 3.5s34.4% 3.9s30.5% 6.7s25.3%25.1s20.0%0.8s18.4%11.2s
+GD-500 4.8%16.1s0.6%23.2s0.3%31.4s5.8%26.5s10.4%39.3s11.2%46.9s2.4%58.8s9.5%49.7s33.7%61.7s29.1%78.3s22.0%2.1m11.6%36.6s14.5%86.3s
+FI-500 4.5%17.5s0.1%22.8s0.5%30.9s5.9%35.3s8.4%49.9s13.7%59.0s2.9%74.9s10.3%63.4s32.3%75.3s31.0%1.7m23.3%2.4m10.7%46.0s18.8%2.4m
+BI-500 4.2%19.8s0.0%22.8s0.5%30.9s5.1%34.3s8.9%47.3s10.9%60.5s2.7%73.1s10.1%62.5s33.5%75.2s29.7%1.7m22.2%2.5m11.3%42.5s15.1%2.1m
+Ours-500 2.1% 6.9s0.0% 6.8s0.0% 7.1s4.4% 7.5s6.4% 8.0s7.0% 8.9s0.2%10.2s7.3% 9.0s29.6% 8.8s25.5% 9.7s21.4%12.5s8.2%7.4s12.4%11.7s
+GD-5000 4.8%2.7m0.6%3.9m0.3%5.2m5.8%4.4m10.4%6.5m11.2%7.8m2.4%9.7m9.5%8.3m33.7%10.2m29.1%13.0m22.0%20.7m11.6%6.1m14.5%14.1m
+FI-5000 2.9%2.8m0.0%3.8m0.0%5.1m3.6%6.2m6.1%8.3m8.3%9.8m0.3%9.8m8.4%12.0m25.9%11.9m25.8%18.0m21.3%24.4m8.2%7.7m13.7%24.9m
+BI-5000 1.9%2.8m0.0%3.8m0.1%5.1m5.0%6.2m6.0%8.6m6.1%10.1m0.2%9.6m9.0%11.8m25.5%11.8m25.2%17.8m20.6%24.6m8.0%7.7m12.0%22.1m
+Ours-1000 1.8%14.0s0.0%13.9s0.0%14.5s2.3%15.0s5.1%16.0s5.7%17.5s0.0%20.4s6.6%18.2s24.5%17.6s23.5%19.0s20.1%25.4s6.6%15.0s10.5%23.4s
+Ours-2000 1.8%27.9s0.0%28.3s0.0%28.7s1.8%30.1s4.0%32.2s3.4%34.2s0.0%40.4s6.3%35.9s21.8%34.7s21.7%38.8s19.0%49.5s5.7%29.9s9.6%47.0s
+Ours-5000 1.8%70.0s0.0%71.0s0.0%73.7s0.9%75.1s3.4%80.9s2.6%85.4s0.0%99.3s5.9%88.8s17.8%86.9s17.0%99.8s17.1%2.1m3.8%75.9s8.7%1.9m
+intraining2, includingTaillard(Taillard,1993), ABZ(Adamsetal.,1988), FT(Fisher,1963), LA
+(Lawrence, 1984), SWV (Storer et al., 1992), ORB (Applegate & Cook, 1991), and YN (Yamada
+&Nakano,1992). Sincetheupperboundfoundinthesedatasetsisusuallyobtainedwithdifferent
+SOTA metaheuristic methods (e.g., (Constantino & Segura, 2022)), we have implicitly compared
+with them although we did not explicitly list those metaheuristic methods. It is also worth noting
+thatthetraininginstancesaregeneratedbyfollowingdistributionsdifferentfromthesebenchmark-
+ingdatasets. Therefore,wehavealsoimplicitlytestedthezero-shotgeneralizationperformanceof
+our method. Moreover, we consider three extremely large datasets (up to 1000 jobs), where our
+methodoutperformsCP-SATbyalargemargin. ThedetailedresultsarepresentedinAppendixL.
+Model and configuration. Please refer to Appendix B for the hardware and training
+(and testing) configurations of our method. Our code and data are publicly available at
+https://github.com/zcaicaros/L2S.
+Baselines. We compare our method with three state-of-the-art DRL-based methods, namely L2D
+(Zhangetal.,2020),RL-GNN(Parketal.,2021b),andScheduleNet(Parketal.,2021a).Theonline
+DRLmethodin(Tasseletal.,2021)isonlycomparedonTaillard30×20instancesforwhichtheyre-
+portresults. Wealsocomparewiththreehand-craftedruleswidelyusedinimprovementheuristics,
+i.e. greedy(GD),best-improvement(BI)andfirst-improvement(FI),toverifytheeffectivenessof
+automaticallylearningimprovementpolicy. Forafaircomparison,weletthemstartfromthesame
+initial solutions as ours, and allow BI and FI to restart so as to escape local minimum. Also, we
+equip them with the message-passing evaluator, which can significantly speed up their calculation
+since they need to evaluate the whole neighbourhood at each step. More details are presented in
+AppendixE.ThelastmajorbaselineisthehighlyefficientconstraintprogrammingsolverCP-SAT
+(Perron & Furnon, 2019) in Google OR-Tools, which has strong capability in solving scheduling
+problems (Da Col & Teppan, 2019), with 3600 seconds time limit. We also compare our method
+withanadvancedtabusearchalgorithm(Zhangetal.,2007). Theresultsdemonstratetheadvanta-
+geousefficiencyofourapproachinselectingmovesandachievingbettersolutionswithinthesame
+computationaltime(seeSectionHfordetails).
+2The best-known results for these public benchmarks are available in http://optimizizer.com/TA.php and
+http://jobshop.jjvh.nl/.
+8
+
+--- PAGE 9 ---
+PublishedasaconferencepaperatICLR2024
+5.2 PERFORMANCEONCLASSICBENCHMARKS
+Wefirstevaluateourmethodonthesevenclassicbenchmarks,byrunning500improvementstepsas
+intraining.Here,wesolveeachinstanceusingthemodeltrainedwiththeclosestsize.InAppendixI,
+wewillshowthattheperformanceofourmethodcanbefurtherenhancedbysimplyassemblingall
+the trained models. For the hand-crafted rules, we also run them for 500 improvement steps. We
+reproduceRL-GNNandScheduleNetsincetheirmodelsandcodearenotpubliclyavailable. Note
+thattohaveafaircomparisonoftheruntime,forallmethods,wereporttheaveragetimeofsolving
+a single instance without batching. Results are gathered in Table 1 (upper part in each of the two
+majorrows). Wecanobservethatourmethodiscomputationallyefficient,andalmostconsistently
+outperformsthethreeDRLbaselineswithonly500steps. RL-GNNandScheduleNetarerelatively
+slowerthanL2D,especiallyforlargeproblemsizes,becausetheyadoptanevent-drivenbasedMDP
+formulation. On most of the instances larger than 20×15, our method is even faster than the best
+learning-basedconstructionheuristicScheduleNet, andmeanwhiledeliversmuchsmallergaps. In
+Appendix C.2, we will provide a more detailed comparison on the efficiency with RL-GNN and
+ScheduleNet. Withthesame500steps,ourmethodalsoconsistentlyoutperformstheconventional
+hand-craftedimprovementrules. Thisshowsthatthelearnedpoliciesareindeedbetterintermsof
+guidingtheimprovementprocess. Moreover,ourmethodismuchfasterthantheconventionalones,
+whichverifiestheadvantageofourmethodinthattheneighbourselectionisdirectlyattainedbya
+neuralnetwork,ratherthanevaluatingthewholeneighbourhood.
+5.3 GENERALIZATIONTOLARGERIMPROVEMENTSTEPS
+We further evaluate the capability of our method in generalizing to larger improvement steps (up
+to 5000). Results are also gathered in Table 1 (lower part in each major row), where we report
+the results for hand-crafted rules after 5000 steps. We can observe that the improvement policies
+learnedbyouragentfor500stepsgeneralizefairlywelltoalargernumberofsteps.Althoughrestart
+isallowed,thegreedyrule(GD)stopsimprovingafter500stepsduetotheappearanceof“cycling”
+asitcouldbetrappedbyrepeatedlyselectingamongseveralmoves(Nowicki&Smutnicki,1996).
+This is a notorious issue that causes the failure to hand-craft rules for JSSP. However, our agent
+could automatically learn to escape the cycle even without restart, by maximizing the long-term
+return. Inaddition,itisworthnoticingthatourmethodwith5000stepsistheonlyonethatexceeds
+CP-SATonTaillard100×20instances,thelargestonesinthesebenchmarks. Besidestheresultsin
+Table1,ourmethodalsooutperformstheonlineDRL-basedmethod(Tasseletal.,2021)onTaillard
+30×20instances,whichreportsagapof13.08%with600sruntime, whileourmethodwith5000
+stepsproducesagapof12.6%in144s. ThedetailedresultsarepresentedinAppendixF.Itisalso
+apparentfromTable1thattheruntimeofourmodelislinearw.r.tthenumberofimprovementsteps
+T foranyproblemsize.
+5.4 COMPARISONWITHTABUSEARCH
+Due to the page limit, we refer readers to Appendix H for details. In a nutshell, the performance
+of our method is comparable to that of tabu search when using the same number of improvement
+stepsbutwithasignificantspeedadvantage.Ontheotherhand,ourmethodoutperformstabusearch
+whenthecomputationaltime(wallclocktime)isthesame.
+6 CONCLUSIONS AND FUTURE WORK
+ThispaperpresentsaDRL-basedmethodtolearnhigh-qualityimprovementheuristicsforsolving
+JSSP.Byleveragingtheadvantageofdisjunctivegraphinrepresentingcompletesolutions,wepro-
+poseanovelgraphembeddingschemebyfusinginformationfromthegraphtopologyandhetero-
+geneityofneighbouringnodes. Wealsodesignanovelmessage-passingevaluatortospeedupbatch
+solutionevaluation. Extensiveexperimentsonclassicbenchmarkinstanceswellconfirmthesuperi-
+orityofourmethodtothestate-of-the-artDRLbaselinesandhand-craftedimprovementrules. Our
+methodsreducetheoptimalitygapsonsevenclassicbenchmarksbyalargemarginwhilemaintain-
+ingareasonablecomputationalcost. Inthefuture,weplantoinvestigatethepotentialofapplying
+ourmethodtomorepowerfulimprovementframeworkstofurtherboosttheirperformance.
+9
+
+--- PAGE 10 ---
+PublishedasaconferencepaperatICLR2024
+7 ACKNOWLEDGEMENT
+This research was supported by the Singapore Ministry of Education (MOE) Academic Research
+Fund (AcRF) Tier 1 grant. This work is also partially supported by the MOE AcRF Tier 1 fund-
+ing (RG13/23). This research was also supported by the National Natural Science Foundation of
+China under Grant 62102228, and the Natural Science Foundation of Shandong Province under
+GrantZR2021QF063. TheauthorssincerelythankYifanYangfromtheSchoolofEngineeringand
+ComputerScienceofVictoriaUniversityofWellingtonforherhelponimprovingthecamera-ready
+versionofthemanuscript.
+REFERENCES
+Joseph Adams, Egon Balas, and Daniel Zawack. The shifting bottleneck procedure for job shop
+scheduling. ManagementScience,34(3):391–401,1988.
+David Applegate and William Cook. A computational study of the job-shop scheduling problem.
+ORSAJournalonComputing,3(2):149–156,1991.
+EgonBalas. Machinesequencingviadisjunctivegraphs: animplicitenumerationalgorithm. Oper-
+ationsResearch,17(6):941–957,1969.
+YoshuaBengio,AndreaLodi,andAntoineProuvost. Machinelearningforcombinatorialoptimiza-
+tion: amethodologicaltourd’horizon. EuropeanJournalofOperationalResearch,2020.
+XinyunChenandYuandongTian. Learningtoperformlocalrewritingforcombinatorialoptimiza-
+tion. AdvancesinNeuralInformationProcessingSystems,32:6281–6292,2019.
+Jinho Choo, Yeong-Dae Kwon, Jihoon Kim, Jeongwoo Jae, Andre´ Hottung, Kevin Tierney, and
+Youngjune Gwon. Simulation-guided beam search for neural combinatorial optimization. In
+AliceH.Oh, AlekhAgarwal, DanielleBelgrave, andKyunghyunCho(eds.), AdvancesinNeu-
+ralInformationProcessingSystems,2022. URLhttps://openreview.net/forum?id=
+tYAS1Rpys5.
+OscarHerna´ndezConstantinoandCarlosSegura. Aparallelmemeticalgorithmwithexplicitman-
+agementofdiversityforthejobshopschedulingproblem. AppliedIntelligence,52(1):141–153,
+2022.
+GiacomoDaColandErichCTeppan. Industrialsizejobshopschedulingtackledbypresentdaycp
+solvers. InInternationalConferenceonPrinciplesandPracticeofConstraintProgramming,pp.
+144–160.Springer,2019.
+MatthiasFeyandJanE.Lenssen. FastgraphrepresentationlearningwithPyTorchGeometric. In
+ICLRWorkshoponRepresentationLearningonGraphsandManifolds,2019.
+Henry Fisher. Probabilistic learning combinations of local job-shop scheduling rules. Industrial
+Scheduling,pp.225–251,1963.
+Pierre Hansen and Nenad Mladenovic´. First vs. best improvement: An empirical study. Discrete
+AppliedMathematics,154(5):802–817,2006.
+Andre´ Hottung, Yeong-Dae Kwon, and Kevin Tierney. Efficient active search for combinatorial
+optimization problems. In International Conference on Learning Representations, 2022. URL
+https://openreview.net/forum?id=nO5caZwFwYu.
+Zangir Iklassov, Dmitrii Medvedev, Ruben Solozabal, and Martin Takac. Learning to generalize
+dispatchingrulesonthejobshopscheduling. arXivpreprintarXiv:2206.04423,2022.
+Sergey Ioffe and Christian Szegedy. Batch normalization: Accelerating deep network training by
+reducinginternalcovariateshift. InInternationalconferenceonmachinelearning,pp.448–456.
+PMLR,2015.
+DieterJungnickelandDJungnickel. Graphs,networksandalgorithms. Springer,2005.
+10
+
+--- PAGE 11 ---
+PublishedasaconferencepaperatICLR2024
+Wouter Kool, Herke van Hoof, and Max Welling. Attention, learn to solve routing problems! In
+InternationalConferenceonLearningRepresentations,2018.
+Yeong-Dae Kwon, Jinho Choo, Byoungjip Kim, Iljoo Yoon, Youngjune Gwon, and Seung-
+jai Min. Pomo: Policy optimization with multiple optima for reinforcement learning. In
+H. Larochelle, M. Ranzato, R. Hadsell, M.F. Balcan, and H. Lin (eds.), Advances in Neu-
+ral Information Processing Systems, volume 33, pp. 21188–21198. Curran Associates, Inc.,
+2020. URL https://proceedings.neurips.cc/paper_files/paper/2020/
+file/f231f2107df69eab0a3862d50018a9b2-Paper.pdf.
+Yeong-Dae Kwon, Jinho Choo, Iljoo Yoon, Minah Park, Duwon Park, and Youngjune
+Gwon. Matrix encoding networks for neural combinatorial optimization. In M. Ranzato,
+A. Beygelzimer, Y. Dauphin, P.S. Liang, and J. Wortman Vaughan (eds.), Advances in Neu-
+ral Information Processing Systems, volume 34, pp. 5138–5149. Curran Associates, Inc.,
+2021. URL https://proceedings.neurips.cc/paper_files/paper/2021/
+file/29539ed932d32f1c56324cded92c07c2-Paper.pdf.
+Stephen Lawrence. Resouce constrained project scheduling: An experimental investigation of
+heuristic scheduling techniques (supplement). Graduate School of Industrial Administration,
+Carnegie-MellonUniversity,1984.
+HelenaRamalhinhoLourenc¸o,OlivierCMartin,andThomasStu¨tzle. Iteratedlocalsearch: Frame-
+workandapplications. InHandbookofmetaheuristics,pp.129–168.Springer,2019.
+HaoLu,XingwenZhang,andShuangYang. Alearning-basediterativemethodforsolvingvehicle
+routingproblems. InInternationalConferenceonLearningRepresentations,2019.
+YiningMa,ZhiguangCao,andYeowMengChee.Learningtosearchfeasibleandinfeasibleregions
+of routing problems with flexible neural k-opt. In Advances in Neural Information Processing
+Systems,volume36,2023.
+Ashvin Nair, Bob McGrew, Marcin Andrychowicz, Wojciech Zaremba, and Pieter Abbeel. Over-
+comingexplorationinreinforcementlearningwithdemonstrations. In2018IEEEInternational
+ConferenceonRoboticsandAutomation(ICRA),pp.6292–6299.IEEE,2018.
+Fei Ni, Jianye Hao, Jiawen Lu, Xialiang Tong, Mingxuan Yuan, Jiahui Duan, Yi Ma, and Kun
+He. Amulti-graphattributedreinforcementlearningbasedoptimizationalgorithmforlarge-scale
+hybridflowshopschedulingproblem. InProceedingsofthe27thACMSIGKDDConferenceon
+KnowledgeDiscovery&DataMining,pp.3441–3451,2021.
+EugeniuszNowickiandCzeslawSmutnicki.Afasttaboosearchalgorithmforthejobshopproblem.
+Managementscience,42(6):797–813,1996.
+Eugeniusz Nowicki and Czesław Smutnicki. An advanced tabu search algorithm for the job shop
+problem. JournalofScheduling,8(2):145–159,2005.
+Junyoung Park, Sanjar Bakhtiyar, and Jinkyoo Park. Schedulenet: Learn to solve multi-agent
+schedulingproblemswithreinforcementlearning. arXivpreprintarXiv:2106.03051,2021a.
+Junyoung Park, Jaehyeong Chun, Sang Hun Kim, Youngkook Kim, Jinkyoo Park, et al. Learning
+to schedule job-shop problems: representation and policy learning using graph neural network
+and reinforcement learning. International Journal of Production Research, 59(11):3360–3377,
+2021b.
+AdamPaszke,SamGross,FranciscoMassa,AdamLerer,JamesBradbury,GregoryChanan,Trevor
+Killeen, Zeming Lin, Natalia Gimelshein, Luca Antiga, et al. Pytorch: An imperative style,
+high-performancedeeplearninglibrary. AdvancesinNeuralInformationProcessingSystems,32:
+8026–8037,2019.
+LaurentPerron andVincent Furnon. Or-tools, 2019. URL https://developers.google.
+com/optimization/.
+11
+
+--- PAGE 12 ---
+PublishedasaconferencepaperatICLR2024
+Martin Riedmiller, Roland Hafner, Thomas Lampe, Michael Neunert, JonasDegrave, Tom van de
+Wiele, Vlad Mnih, Nicolas Heess, and Jost Tobias Springenberg. Learning by playing solving
+sparserewardtasksfromscratch. InJenniferDyandAndreasKrause(eds.),Proceedingsofthe
+35thInternationalConferenceonMachineLearning,volume80,pp.4344–4353.PMLR,2018.
+Veronique Sels, Nele Gheysen, and Mario Vanhoucke. A comparison of priority rules for the job
+shopschedulingproblemunderdifferentflowtime-andtardiness-relatedobjectivefunctions. In-
+ternationalJournalofProductionResearch,50(15):4255–4270,2012.
+RobertHStorer,SDavidWu,andRenzoVaccari. Newsearchspacesforsequencingproblemswith
+applicationtojobshopscheduling. ManagementScience,38(10):1495–1509,1992.
+Eric Taillard. Benchmarks for basic scheduling problems. European Journal of Operational Re-
+search,64(2):278–285,1993.
+Pierre Tassel, Martin Gebser, and Konstantin Schekotihin. A reinforcement learning environment
+forjob-shopscheduling. arXivpreprintarXiv:2104.03760,2021.
+Pierre Tassel, Martin Gebser, and Konstantin Schekotihin. An end-to-end reinforcement learning
+approach for job-shop scheduling problems based on constraint programming. arXiv preprint
+arXiv:2306.05747,2023a.
+PierreTassel,BenjaminKova´cs,MartinGebser,KonstantinSchekotihin,PatrickSto¨ckermann,and
+Georg Seidel. Semiconductor fab scheduling with self-supervised and reinforcement learning.
+arXivpreprintarXiv:2302.07162,2023b.
+Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N Gomez,
+ŁukaszKaiser,andIlliaPolosukhin. Attentionisallyouneed. InAdvancesinneuralinformation
+processingsystems,pp.5998–6008,2017.
+Petar Velicˇkovic´, Guillem Cucurull, Arantxa Casanova, Adriana Romero, Pietro Lio`, and Yoshua
+Bengio. Graph Attention Networks. International Conference on Learning Representations,
+2018. URLhttps://openreview.net/forum?id=rJXMpikCZ.
+Petar Velicˇkovic´, Guillem Cucurull, Arantxa Casanova, Adriana Romero, Pietro Lio`, and Yoshua
+Bengio. Graph attention networks. In International Conference on Learning Representations,
+2018.
+RonaldJWilliams. Simplestatisticalgradient-followingalgorithmsforconnectionistreinforcement
+learning. MachineLearning,8(3):229–256,1992.
+YaoxinWu,WenSong,ZhiguangCao,JieZhang,andAndrewLim. Learningimprovementheuris-
+ticsforsolvingroutingproblem. IEEETransactionsonNeuralNetworksandLearningSystems,
+2021.
+LiangXin,WenSong,ZhiguangCao,andJieZhang.Multi-decoderattentionmodelwithembedding
+glimpseforsolvingvehicleroutingproblems.InProceedingsoftheAAAIConferenceonArtificial
+Intelligence,volume35,pp.12042–12049,2021a.
+LiangXin, WenSong, ZhiguangCao, andJieZhang. Neurolkh: Combiningdeeplearningmodel
+withlin-kernighan-helsgaunheuristicforsolvingthetravelingsalesmanproblem. InAdvancesin
+NeuralInformationProcessingSystems,volume34,2021b.
+Keyulu Xu, Weihua Hu, Jure Leskovec, and Stefanie Jegelka. How powerful are graph neural
+networks? In International Conference on Learning Representations, 2019. URL https:
+//openreview.net/forum?id=ryGs6iA5Km.
+TakeshiYamadaandRyoheiNakano. Ageneticalgorithmapplicabletolarge-scalejob-shopprob-
+lems. InPPSN,volume2,pp.281–290,1992.
+ChaoYongZhang,PeiGenLi,ZaiLinGuan,andYunQingRao. Atabusearchalgorithmwithanew
+neighborhoodstructureforthejobshopschedulingproblem. Computers&OperationsResearch,
+34(11):3229–3242,2007.
+12
+
+--- PAGE 13 ---
+PublishedasaconferencepaperatICLR2024
+Cong Zhang, Wen Song, Zhiguang Cao, Jie Zhang, Puay Siew Tan, and Xu Chi.
+Learning to dispatch for job shop scheduling via deep reinforcement learning. In
+H. Larochelle, M. Ranzato, R. Hadsell, M.F. Balcan, and H. Lin (eds.), Advances
+in Neural Information Processing Systems, volume 33, pp. 1621–1632. Curran Asso-
+ciates, Inc., 2020. URL https://proceedings.neurips.cc/paper/2020/file/
+11958dfee29b6709f48a9ba0387a2431-Paper.pdf.
+Jianan Zhou, Yaoxin Wu, Wen Song, Zhiguang Cao, and Jie Zhang. Towards omni-generalizable
+neuralmethodsforvehicleroutingproblems. InInternationalConferenceonMachineLearning,
+2023.
+A THE n-STEP REINFORCE ALGORITHM
+We adopt the REINFORCE algorithm (Williams, 1992) for training. However, here the vanilla
+REINFORCEmaybringundesiredchallengesintrainingfortworeasons. First,therewardissparse
+in our case, especially when the improvement process becomes longer. This is a notorious reason
+causingvariousDRLalgorithmstofail(Nairetal.,2018;Riedmilleretal.,2018). Second, itwill
+easily cause out-of-memory issue if we employ a large step limit T, which is often required for
+desirable improvement performance. To tackle these challenges, we design an n-step version of
+REINFORCE,whichtrainsthepolicyeverynstepsalongthetrajectory(thepseudo-codeisgiven
+below). Sincethen-stepREINFORCEonlyrequiresstoringeverynstepsoftransitions,theagent
+canexploreamuchlongerepisode. Thistrainingmechanismalsohelpsdealwithsparsereward,as
+theagentwillbetrainedfirstonthedataatthebeginningwheretherewardisdenser,suchthatitis
+readyfortheharderpartwhentheepisodegoeslonger.
+Wepresentthepseudo-codeofthen-stepREINFORCEalgorithminAlgorithm1.
+Algorithm1n-stepREINFORCE
+Input: Policyπ (a |s ),steplimitT,stepsizen,learningrateα,trainingproblemsize|J|×|M|,
+θ t t
+batchsizeB,totalnumberoftraininginstancesI
+Output: Trainedpolicyπ (a |s )
+θ∗ t t
+1: fori=0toi<I do
+2: Randomly generate B instances of size |J| × |M|, and compute their initial solutions
+{s1,...,sB}byusingthedispatchingruleFDD/MWKR
+0 0
+3: InitializeatrainingdatabufferDbwithsize0foreachsb ∈{s1,...,sB};
+0 0 0
+4: fort=0toT do
+5: forsb ∈{s1,...,sB}do
+t t t
+6: Computealocalmoveab t ∼π θ (ab t |sb t )
+7: Updatesbw.r.tabandreceivearewardr(ab,sb)
+t t t t
+8: iftmodn=0then
+9: lossb =0
+θ
+10: forj =nto0do
+11: lossb θ +=−logπ θ (ab t−j |sb t−j )·R t b −j ,whereR t b −j isthereturnforstept−j
+12: endfor
+13: θ =θ+α∇ θ (cid:0) lossb θ (cid:1) ;
+14: endif
+15: endfor
+16: endfor
+17: i=i+B
+18: endfor
+19: returnπ θ′ (a t |s t )
+B HARDWARE AND CONFIGURATIONS
+Weusefixedhyperparametersempiricallytunedonsmallproblems. WeadoptK = 4iterationsof
+TPM and CAM updates. In each TPM iteration, MLPk has 2 hidden layers with dimension 128,
+T
+13
+
+--- PAGE 14 ---
+PublishedasaconferencepaperatICLR2024
+andϵk issetto0following(Xuetal.,2019). ForCAM,bothGATk andGATk haveoneattention
+J M
+head. For action selection, MLP has 4 hidden layers with dimension 64. All raw features are
+A
+normalizedbydividingalargenumber,wherep isdividedby99,andest andlst aredivided
+ji ji ji
+by1000. Foreachtrainingproblemsize,wetrainthepolicynetworkwith128000instances,which
+are generated on the fly in batches of size 64. We use n = 10 and step limit T = 500 in our n-
+step REINFORCE (refer to Appendix A for the pseudo-code), with Adam optimizer and constant
+learning rate α = 5 × 10−5. Another set of 100 instances is generated for validation, which is
+performedevery10batchesoftraining. Throughoutourexperiments, wesampleactionsfromthe
+policy. Allinitialsolutionsarecomputedbyawidelyuseddispatchingrule,i.e. theminimumratio
+of Flow Due Date to Most Work Remaining (FDD/MWKR) (Sels et al., 2012). During testing,
+we let our method run for longer improvement steps by setting T to 500, 1000, 2000, and 5000,
+respectively. Our model is implemented using Pytorch-Geometric (PyG) (Fey & Lenssen, 2019).
+Other parameters follow the default settings in PyTorch (Paszke et al., 2019). We use a machine
+withAMDRyzen3600CPUandasingleNvidiaGeForce2070SGPU.Wewillmakeourcodeand
+datapubliclyavailable.
+C COMPUTATIONAL COMPLEXITY ANALYSIS
+C.1 PROOFOFPROPOSITION4.1
+WefirstprovethatthecomputationalcomplexityforTMPandCAMislinearforthenumberofjobs
+|J|andthenumberofmachines|M|,respectively.Throughouttheproofs,welet|O|=|J|·|M|+2
+and|E|=|C∪D|=|C|+|D|=2|J|·|M|+|J|−|M|denotethetotalnumberofnodesandthe
+totalnumberofedgesinG,respectively.
+Lemma C.1. Any layer k of TPM possesses linear computational complexity w.r.t. both |J| and
+|M|whencalculatingnodeembeddingµk andgraphlevelembeddingµk.
+V G
+Proof.Forthek-thTPMlayer,thematrixformofeachMLPlayerζ canbewrittenas:
+(cid:16) (cid:16) (cid:17)(cid:17)
+M =BN(ζ) σ(ζ) ((A+(1+ϵ )·I)·M )·W(ζ) ,forζ =1,··· ,Z (9)
+k k k−1 k
+whereM , M ∈R|O|×p arethenodeembeddingsfromlayerk−1andk,respectively,ϵ ∈R
+k−1 k k
+and W(ζ) ∈ Rp×p are learnable parameters, σ is an element-wise activation function (e.g. relu
+k
+or tanh), BN is a layer of batch normalization (Ioffe & Szegedy, 2015), and the operator “·”
+denotingthematrixmultiplication. Then,thecomputationaltimeofequation(9)canbeboundedby
+O(|E|p2+Z|O|p2+Z|O|·(p2+p)). Specifically,O(|E|p2)isthetotalcostformessagepassing
+andaggregation. NotethatsinceweadoptthesparsematrixrepresentationforA,thecomplexityof
+messagepassingandaggregationwillbefurtherreducedtoO(|E|p)inpractice. ThetermZ|O|p2is
+thetotalcostforfeaturetransformationbyapplyingW(ζ),andZ|O|·(p2+p)isthecostforbatch
+k
+normalization. ThisanalysisshowsthatthecomplexityofTPMlayerforembeddingadisjunctive
+graph G is linear w.r.t. both |J| and |M|. Finally, since we read out the graph level embedding
+by averaging the node embeddings, µk = 1 (cid:80) µk, and the final graph-level embedding is
+G |O| V∈O V
+justthesumofallthatofeachlayer,i.e. µ = (cid:80) µk,wecanconcludethatthelayerk ofTPM
+G k G
+possesseslinearcomputationalcomplexity. □
+Next, weshowthatthecomputationalcomplexityofeachCAMlayerisalsolinearw.r.t. boththe
+numberofjobs|J|andthenumberofmachines|M|.
+Lemma C.2. Any layer k of CAM possesses linear computational complexity w.r.t both |J| and
+|M|whencalculatingnodeembeddingνk.
+V
+Proof.SinceweemployGATasthebuildingblockforembeddingG andG ,thecomputational
+J M
+complexity of the k-th layer of CAM is bounded by that of the GAT layer. By referring to the
+complexityanalysisintheoriginalGATpaper(Velicˇkovic´ etal.,2018), itiseasytoshowthatthe
+computationalcomplexityofanylayerkofCAMequippedwithasingleGATattentionheadcom-
+putingpfeaturesisboundedbyO(2|O|p2+|E|p),sinceG andG bothcontainallnodesinGbut
+J M
+disjointsubsetsofedgesinG(seeFigure4). SimilartoTPM,weemployaverageread-outfunction
+14
+
+--- PAGE 15 ---
+PublishedasaconferencepaperatICLR2024
+350
+300
+250
+200
+150
+100
+50
+0
+10 15 20 25 30 35 40
+Number of machines
+)sdnoces(
+emit
+nur
+egarevA
+RL-GNN
+ScheduleNet 25
+Ours-500
+20
+15
+10
+5
+0
+10 15 20 25 30 35 40
+Number of jobs
+(a) Fixed|J|=40
+)sdnoces(
+emit
+nur
+egarevA
+RL-GNN
+ScheduleNet
+Ours-500
+(b) Fixed|M|=10
+Figure5: ThecomputationalcomplexityofRL-GNN,ScheduleNet, andourmethod(500im-
+provementsteps). Intheleftfigure,wefix|J|=40andtestonvariousnumberofmachines|M|.
+Whileintherightfigure,wefix|M|=10andtestonvariousnumberofjobs|J|.
+forthefinalgraphlevelembeddingν = 1 (cid:80) νK,whereνK isthenodeembeddingsfrom
+G |O| V∈O V V
+thelastlayerK. Thus,theoverallcomplexityofCAMislinearw.r.t. both|J|and|M|. □
+Finally,theTheorem4.1isprovedbythefactthatouractionselectionnetworkisjustanotherMLP
+whosecomplexityislineartotheinputbatchsize,whichisthetotalnumberofnodesinG. □
+C.2 COMPUTATIONALCOMPLEXITYCOMPAREDWITHDRLBASELINES
+In this part, we empirically compare the computational complexity with the two best-performing
+DRL baselines RL-GNN (Park et al., 2021b) and ScheduleNet (Park et al., 2021a). While L2D
+(Zhang et al., 2020) is very fast, here we do not compare with it due to its relatively poor perfor-
+mance. Weconducttwosetsofexperiments, wherewefixoneelementinthenumberofjobs|J|
+andmachines|M|,andchangetheothertoexaminethetrendoftimeincrease. Foreachpairof|J|
+and|M|,werandomlygenerate10instancesandrecordtheaverageruntime.
+InFigure5,weplottheaverageruntimeofRL-GNN,ScheduleNetandourmethod(500steps)in
+thesetwoexperiments. Wecantellthatthecomputationalcomplexityofourmethodislinearw.r.t.
+|J|and|M|,whichisinlinewithourtheoreticalanalysisinProposition4.1. InFigure5(a)where
+|J| is fixed, the run time of RL-GNN and ScheduleNet appears to be linearly and quadratically
+increasingw.r.t|M|,respectively. Thisisbecausethenumberofedgesinthegraphrepresentations
+ofRL-GNNandScheduleNetareboundedbyO(|M|)andO(|M|2),respectively. WhileinFigure
+5(b) where |M| is fixed, the run time of RL-GNN and ScheduleNet are quadratically and linearly
+increasingw.r.t|J|,becausethenumberofedgesarenowboundedbyO(|J|2)andO(|J|),respec-
+tively. InFigure5(b),thereasonwhyourmethodtakeslongertimewhentheproblemsizeissmall,
+e.g. 10×10, is that our method performs 500 improvement steps regardless of the problem size.
+In contrast, RL-GNN and ScheduleNet are construction methods, for which the construction step
+closelydependsontheproblemsize. Forsmallerproblems,theyusuallytakelessstepstoconstruct
+a solution, hence are faster. However, when the problem becomes larger, their run time increase
+rapidlyandsurpassours,asshownintherightpartofFigure5(b).
+D MESSAGE-PASSING FOR CALCULATING SCHEDULE
+D.1 PROOFOFTHEOREM4.2
+Wefirstshowhowtocomputeest bythecriticalpathmethod(CPM)(Jungnickel&Jungnickel,
+V
+2005).ForanygivendisjunctivegraphG=(O,C∪D)ofasolutions,theremustexistatopological
+orderamongnodesofGϕ:O →{1,2,··· ,|O|},whereanodeV issaidtohavethehigherorder
+15
+
+--- PAGE 16 ---
+PublishedasaconferencepaperatICLR2024
+Table2: Runtimeofourevaluator(MP)versusCPM.“Speedup”istheratioofCPM(CPU)to
+MP(GPU).
+Batchsize 1 32 64 128 256 512
+MP(CPU) 0.051s 0.674s 1.216s 2.569s 5.219s 10.258s
+MP(GPU) 0.058s 0.094s 0.264s 0.325s 0.393s 0.453s
+CPM(CPU) 0.009s 0.320s 0.634s 1.269s 2.515s 5.183s
+Speedup 0.16× 3.40× 2.40× 3.90× 6.42× 11.4×
+thannodeU ifϕ(V) < ϕ(U). Letest = 0fornodeO . ThenforanynodeV ∈ O\{O },est
+S S S V
+canbecalculatedrecursivelybyfollowingthetopologicalorderϕ,i.e. est = max (p +est )
+V U U U
+whereU ∈N isaneighbourofV.
+V
+Proof. Now we show that the message passing is equivalent to this calculation. Specifically, for
+any node V, if ∀U ∈ N ,c = 0 then d = mp ({p +(1−c )·d |∀U ∈ N(V)}) =
+V U V max U U U
+max (p +d ). Thenitiseasytoshowthatthemessagec = 0ifandonlyifc = 0for
+U∈NV U U V W
+all W ∈ {W|ϕ(W) < ϕ(V)} and there is a path from W to V. This is because of two reasons.
+First,themessagealwayspassesfromthehigherranknodestothelowerranknodesfollowingthe
+topologicalorderinthedisjunctivegraphG. Second,c =0otherwisemessagec(W)=1willbe
+V
+recursivelypassedtonodeV viathemessagepassingcalculationc = mp ({c |∀U∈N(V)).
+V max U
+Hence, d = est for all U ∈ N when all c = 0. Therefore, d = max (p +d ) =
+U U V U V U∈NV U U
+max (p +est )=est . Finally,d =est =C asthemessagewilltakeuptoH steps
+tore U ac ∈ h N O V U fromO U andthe V processingt T imeofO T is0 m . ax □
+T S T
+D.2 PROOFOFCOROLLARY4.3
+Computing lst by CPM follows a similar logic. We define ϕ¯ : O → {1,2,··· ,|O|} as the
+V
+reversedtopologicalorderofV ∈ O,i.e. ϕ¯(V) < ϕ¯(U)ifandonlyifϕ(V) > ϕ(U)(inthiscase,
+node O will rank the first according to ϕ¯). Let lst = C for node O . Then for any node
+T T max T
+V ∈O\{O },lst canbecalculatedrecursivelybyfollowingthereversedtopologicalorderϕ¯,i.e.
+T V
+lst =min (−p +lst )whereV ∈N isaneighbourofU inG.
+V U U U U
+Now,wecanshowthatd¯ =mp ({p +(1−c¯ )·d¯ })=mp ({p +d¯ })=max (p −
+V max U U U max U U U U
+d¯ )=max (p −lst )=−lst whenc¯ =0forallU ∈N byfollowingthesameprocedure
+U U U U V U V
+in the above proof for Proposition 4.2. Finally, d¯ = lst = 0 as the message will take up to H
+S S
+stepstoreachO fromO ,sincethelengthsofthelongestpathinGandG¯ areequal. □
+S T
+D.3 EFFICIENCYOFTHEMESSAGE-PASSINGEVALUATOR
+We compare the computational efficiency of our message-passing evaluator with traditional CPM
+on problems of size 100×20, which are the largest in our experiments. We implement CPM in
+Python, followingtheprocedureinSection3.6of(Jungnickel&Jungnickel,2005). Werandomly
+generatebatchesofinstanceswithsize1,32,64,128,256and512,andrandomlycreateadirected
+disjunctivegraph(i.e. asolution)foreachinstance. Wegatherthetotalruntimeofthetwomethods
+in Table 2, where we report results of both the CPU and GPU versions of our evaluator. We can
+observe that although our message-passing evaluator does not present any advantage on a single
+graph,theperformancedrasticallyimprovesalongwiththeincreaseofbatchsize.Forabatchof512
+graphs,ourevaluatorrunsonGPUismorethan11timesfasterthanCPM.Wecanconcludethatour
+message-passing evaluator with GPU is superior in processing large graph batches, confirming its
+effectivenessinutilizingtheparallelcomputationalpowerofGPU.Thisofferssignificantadvantage
+fordeep(reinforcement)learningbasedschedulingmethods,intermsofboththetrainingandtesting
+phase(forexample,solvingabatchofinstances,orsolvingmultiplecopiesofasingleinstancein
+parallelandretrievingthebestsolution).
+16
+
+--- PAGE 17 ---
+PublishedasaconferencepaperatICLR2024
+D.4 ANEXAMPLEOFCALCULATINGestBYUSINGTHEPROPOSEDMESSAGE-PASSING
+EVALUATOR.
+In Figure 6 we present an example of calculating the earliest starting time for each operation in a
+disjunctivegraphusingourproposedmessage-passingoperator.
+(1, 0) (1, 0) (1, 0) (0, 0) (1, 1) (1, 2) (0, 0) (0, 1) (1, 2)
+(1, 0) (1, 0) (1, 0) (1, 3) (1, 3) (1, 2) (1, 3) (1, 3) (1, 2)
+(0,0) (1, 0) (0,0) (1, 3) (0,0) (1, 3)
+(1, 0) (1, 0) (1, 0) (1, 1) (1, 3) (1, 1) (0, 1) (1, 3) (1, 1)
+(a) Beforemessagepassing (b) 1stmessagepassing (c) 2ndmessagepassing
+(0, 0) (0, 1) (0, 3) (0, 0) (0, 1) (0, 3) (0, 0) (0, 1) (0, 3)
+(1, 3) (1, 3) (1, 3) (0, 6) (1, 3) (1, 3) (0, 6) (0, 9) (1, 3)
+(0,0) (1, 6) (0,0) (1, 6) (0,0) (1, 6)
+(0, 1) (1, 3) (1, 1) (0, 1) (1, 3) (1, 1) (0, 1) (0, 9) (1, 1)
+(d) 3rdmessagepassing (e) 4thmessagepassing (f) 5thmessagepassing
+(0, 0) (0, 1) (0, 3) (0, 0) (0, 1) (0, 3) (0, 0) (0, 1) (0, 3)
+(0, 6) (0, 9) (0, 11) (0, 6) (0, 9) (0, 11) (0, 6) (0, 9) (0, 11)
+(0,0) (1, 12) (0,0) (1, 12) (0,0) (0, 15)
+(0, 1) (0, 9) (1, 10) (0, 1) (0, 9) (0, 12) (0, 1) (0, 9) (0, 12)
+(g) 6thmessagepassing (h) 7thmessagepassing (i) 8thmessagepassing
+Figure6: Anexampleoftheforwardmessagepassingforcalculatingest. Thepairofnumbers
+(d ,c ) in the open bracket and the number in the square bracket [p ] denote the messages and
+V V V
+theprocessingtimeforeachvertexV, respectively. Ineachgraph, wehighlightthenodesV with
+c = 0. Aftereighttimesofmessagepassing,c foranynodeV equals0,whichcanbeutilized
+V V
+asasignalfortermination. Then,themessaged equalstheearlieststartingtimeest foreachV.
+V V
+It is clear that the frequency of message passing (8) is less than H, the length of the longest path
+containingthemostnodes,whichis9(O ,O ,O ,O ,O ,O ,O ,O ,O ).
+S 11 12 13 21 22 23 33 T
+E HAND-CRAFTED IMPROVEMENT RULES
+Herewepresentdetailsofthethreehand-craftedrulebaselines,i.e. greedy(GD),best-improvement
+(BI), and first-improvement (FI). The greedy rule is widely used in the tabu search framework
+for JSSP (Zhang et al., 2007). The best-improvement and the first-improvement rules are widely
+usedinsolvingcombinatorialoptimizationalgorithms(Hansen&Mladenovic´,2006). Specifically,
+the greedy rule selects the solution with the smallest makespan in the neighbourhood, while the
+best-improvement and the first-improvement rules select the best makespan-reducing and the first
+makespan-reducingsolutionintheneighbourhood,respectively. Ifthereisnosolutionintheneigh-
+bourhoodwithamakespanlowerthanthecurrentone,thebest-improvementandfirst-improvement
+rulescannotpickanysolutions. However,thegreedyrulewillalwayshavesolutionstopick.
+ItisunfairtodirectlycomparewithBIandFIsincetheymaystuckinthelocalminimumwhenthey
+cannotpickanysolutions.Thusweaugmentthemwithrestart,asimplebuteffectivestrategywidely
+used in combinatorial optimization, to pick a new starting point when reaching local minimum
+17
+
+--- PAGE 18 ---
+PublishedasaconferencepaperatICLR2024
+(Lourenc¸o et al., 2019). While random restart is a simple and direct choice, it performs poorly
+probably because the solution space is too large (Lourenc¸o et al., 2019). Hence, we use a more
+advancedrestartbyadoptingamemorymechanismsimilartotheoneintabusearch(Zhangetal.,
+2007). Specifically,wemaintainalong-termmemoryΩwhichkeepstrackingtheωlatestsolutions
+in the search process, from which a random solution is sampled for restart when reaching local
+minimum. The memory capacity ω controls the exploitation and exploration of the algorithm. If
+ω is too large, it could harm the performance since bad solutions may be stored and selected. On
+thecontrary, toosmallω couldbetoogreedytoexploresolutionsthatarepromising. Hereweset
+ω = 100forabalancedtrade-off. WedonotequipGDwithrestartsinceitalwayshassolutionsto
+selectunlessreachingtheabsorbingstate.
+F COMPARISON WITH THE ONLINE DRL-BASED METHOD
+Themakespanofourmethod(trainedonsize20×15)with5000improvementstepsandtheonline
+DRL-basedmethod(Tasseletal.,2021)insolvingtheTaillard30×20instancesareshowninTable
+3. Notethatthismethodperformstrainingforeachinstanceindividually,whileourmethodlearns
+onlyonepolicyofflinewithoutspecifictuningforeachinstance.
+Table3: DetailedmakespanvaluescomparedwiththeonlineDRLmethod
+Method Tai41 Tai42 Tai43 Tai44 Tai45 Tai46 Tai47 Tai48 Tai49 Tai50
+(Tasseletal.,2021) 2208 2168 2086 2261 2227 2349 2101 2267 2154 2216
+Ours-5000 2248 2186 2144 2202 2180 2291 2123 2167 2167 2188
+G TRAINING CURVES
+0.20
+0.18
+0.16
+0.14
+0.12
+0.10
+0.08
+0 25 50 75 100 125 150 175 200
+Every 10 batches.
+TAS-PC
+ot
+paG
+10×10
+970
+15×10
+15×15 960
+20×10
+20×15 950
+940
+930
+920
+910
+900
+0 25 50 75 100 125 150 175 200
+Every 10 batches.
+(a) Forvariousproblemsizes
+napsekaM
+TPM: 10×10
+CAM: 10×10
+TPM + CAM: 10×10
+(b) Fordifferentmodules
+960
+950
+940
+930
+920
+910
+900
+0 25 50 75 100 125 150 175 200
+Every 10 batches.
+napsekaM
+TPM + CAM-1-Head: 10x10
+TPM + CAM-2-Head: 10x10 960
+940
+920
+900
+0 25 50 75 100 125 150 175 200
+Every 10 batches.
+(c) Fordifferent#ofheadsinCAM
+xamC
+10x10
+(d) Fordifferentseeds
+Figure7: Trainingcurves.
+18
+
+--- PAGE 19 ---
+PublishedasaconferencepaperatICLR2024
+H COMPARISON WITH TABU SEARCH
+WecompareourmethodwithaTabusearch-basedmetaheuristicalgorithmwiththedynamictabu
+size proposed in (Zhang et al., 2007). Since the neighbourhood structure in (Zhang et al., 2007)
+is different from N , to make the comparison fair, we replace it with N (TSN5). We also equip
+5 5
+the tabu search method with our message-passing evaluator to boost speed. We test on all seven
+publicdatasets,whereweconducttwoexperiments. Inthefirstexperiment,wefixthesearchsteps
+to5000. Inthesecondone,weadoptthesameamountofcomputationaltimeof90seconds(already
+sufficient for our method to generate competitive results) for both methods. The results for these
+twoexperimentsarepresentedinTable4andTable5,respectively.
+Table4indicatesthatourmethodcloselytrailsTabusearchwitha1.9%relativegap. Thisisdueto
+the simplicity of our approach as a local search method without complex specialized mechanisms
+(Figure 2), making direct comparison less equitable. However, our method is significantly faster
+thanTabusearchsinceitavoidsevaluatingtheentireneighbourhoodformoveselection.Conversely,
+Table 5 reveals that our method outperforms Tabu search under the same time constraint. This is
+attributedtothedesirableabilityofourmethodtoexplorethesolutionspacemoreefficientlywithin
+theallottedtime,asitdoesnotrequireafullneighbourhoodevaluationformoveselection.
+Table4: PerformancecomparedwithTabusearchfor5000improvementsteps. Foreachprob-
+lem size, we compute the average relative gap of the makespan of our method to the tabu search
+algorithm,andwereportthetime(inseconds)foreachmethodforsolvingasingleinstance.
+Taillard ABZ FT
+Method 15×15 20×15 20×20 30×15 30×20 50×15 50×20 100×20 10×10 20×15 6×6 10×10 20×5
+Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time
+TSN5 0.0%271.5s0.0%311.4s0.0%369.4s0.0%378.6s0.0%422.5s0.0%547.9s0.0%573.0s0.0%1045.8s0.0%177.8s0.0%283.8s0.0%124.0s0.0%213.1s0.0%235.4s
+Ours 2.8% 92.2s3.8%102.1s3.2%114.3s2.8%120.7s4.1%144.4s3.5%168.7s2.7%228.1s1.5% 504.6s-0.1% 75.2s3.1% 99.6s0.0% 67.7s1.7% 74.8s0.4% 73.3s
+LA SWV ORB YN
+Method 10×5 15×5 20×5 10×10 15×10 20×10 30×10 15×15 20×10 20×15 50×10 10×10 20×20
+Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time Gap Time
+TSN5 0.0% 56.5s0.0% 81.9s0.0%116.8s0.0%192.4s0.0%225.1s0.0%233.4s0.0%149.5s0.0% 263.1s0.0%343.1s0.0%383.4s0.0%719.9s0.0%225.0s0.0%318.2s
+Ours 1.4% 70.0s0.0% 71.0s0.0% 73.7s-0.3% 75.1s0.5% 80.9s0.8% 85.4s0.0% 99.3s3.1% 88.8s2.7% 86.9s3.9% 99.8s4.1%126.3s1.1% 75.9s3.6%113.2s
+Table5: PerformancecomparedwithTabusearchfortwominutes. Wereporttheaveragegap
+totheupperboundsolution.
+Taillard ABZ FT
+Method
+15×15 20×15 20×20 30×15 30×20 50×15 50×20 100×20 10×10 20×15 6×6 10×10 20×5
+Ours 5.9% 7.9% 8.8% 9.0% 12.9% 4.9% 7.3% 6.2% 1.2% 8.1% 0.0% 5.3% 0.7%
+TSN5 6.1% 8.0% 8.8% 9.3% 12.4% 5.0% 7.4% 6.5% 1.6% 8.3% 0.0% 5.6% 1.2%
+LA SWV ORB YN
+Method
+10×5 15×5 20×5 10×10 15×10 20×10 30×10 15×15 20×10 20×15 50×10 10×10 20×20
+Ours 0.4% 0.0% 0.0% 0.4% 2.7% 2.1% 0.0% 5.3% 13.4% 14.7% 17.1% 2.7% 8.5%
+TSN5 0.0% 0.0% 0.0% 0.9% 3.0% 2.3% 0.0% 5.4% 13.4% 14.8% 17.3% 3.0% 8.8%
+I ENSEMBLE PERFORMANCE
+TheensembleresultsfortestingandgeneralizationonthesevenbenchmarksarepresentedinTable
+6. Foreachinstance, wesimplyrunallthefivetrainedpoliciesandretrievethebestsolution. We
+canobservethatformostofthecases,withthesameimprovementsteps,theensemblestrategycan
+furtherimprovetheperformance.
+J STATE TRANSITION
+ThestatetransitionishighlyrelatedtotheN neighbourhoodstructure. AswedescribedinPrelim-
+5
+inaries(Section3),onceourDRLagentselectstheoperationpair,say(O ,O )inthesub-figure
+13 21
+ontherightofFigure1,theN operatorwillswaptheprocessingorderofO andO . Originally,
+5 13 21
+theprocessingorderbetweenO andO isO →O .Afterswapping,theprocessingorderwill
+13 21 13 21
+becomeO ←O . However,solelychangingtheorientationofarcO →O isnotenough. In
+13 21 13 21
+thiscase,wemustbreakthearcO → O andintroduceanewdisjunctivearcO → O since
+21 32 13 32
+19
+
+--- PAGE 20 ---
+PublishedasaconferencepaperatICLR2024
+Table6: Ensembleresultsonclassicbenchmarks. Valuesinthetablearetheaveragegaptothe
+best solutions in the literature. Bold means the ensemble strategy performs better with the same
+improvementsteps.
+Taillard ABZ FT
+Method
+15×15 20×15 20×20 30×15 30×20 50×15 50×20 100×20 10×10 20×15 6×6 10×10 20×5
+Closest-500 9.3% 11.6% 12.4% 14.7% 17.5% 11.0% 13.0% 7.9% 2.8% 11.9% 0.0% 9.9% 6.1%
+Closest-1000 8.6% 10.4% 11.4% 12.9% 15.7% 9.0% 11.4% 6.6% 2.8% 11.2% 0.0% 8.0% 3.9%
+Closest-2000 7.1% 9.4% 10.2% 11.0% 14.0% 6.9% 9.3% 5.1% 2.8% 9.5% 0.0% 5.7% 1.5%
+Closest-5000 6.2% 8.3% 9.0% 9.0% 12.6% 4.6% 6.5% 3.0% 1.4% 8.6% 0.0% 5.6% 1.1%
+Ensemble-500 8.8% 11.6% 12.0% 14.4% 17.5% 10.4% 12.9% 7.6% 2.4% 11.5% 0.0% 8.5% 6.1%
+Ensemble-1000 6.3% 10.4% 10.9% 12.2% 15.7% 8.5% 11.0% 6.2% 1.7% 10.6% 0.0% 8.0% 3.9%
+Ensemble-2000 5.9% 9.1% 9.6% 10.6% 14.0% 6.5% 9.2% 4.3% 1.7% 9.4% 0.0% 5.7% 1.5%
+Ensemble-5000 5.5% 8.0% 8.6% 8.5% 12.4% 4.1% 6.5% 2.3% 0.8% 8.5% 0.0% 4.7% 1.1%
+LA SWV ORB YN
+Method
+10×5 15×5 20×5 10×10 15×10 20×10 30×10 15×15 20×10 20×15 50×10 10×10 20×20
+Closest-500 2.1% 0.0% 0.0% 4.4% 6.4% 7.0% 0.2% 7.3% 29.6% 25.5% 21.4% 8.2% 12.4%
+Closest-1000 1.8% 0.0% 0.0% 2.3% 5.1% 5.7% 0.0% 6.6% 24.5% 23.5% 20.1% 6.6% 10.5%
+Closest-2000 1.8% 0.0% 0.0% 1.8% 4.0% 3.4% 0.0% 6.3% 21.8% 21.7% 19.0% 5.7% 9.6%
+Closest-5000 1.8% 0.0% 0.0% 0.9% 3.4% 2.6% 0.0% 5.9% 17.8% 17.0% 17.1% 3.8% 8.7%
+Ensemble-500 2.1% 0.0% 0.0% 3.0% 4.7% 6.9% 0.1% 7.3% 27.2% 25.5% 21.4% 8.0% 12.4%
+Ensemble-1000 1.6% 0.0% 0.0% 2.3% 3.9% 5.7% 0.0% 6.6% 24.5% 23.5% 19.9% 6.5% 10.5%
+Ensemble-2000 1.6% 0.0% 0.0% 1.8% 3.9% 3.4% 0.0% 6.2% 21.7% 21.7% 18.9% 5.4% 9.4%
+Ensemble-5000 1.6% 0.0% 0.0% 0.9% 3.4% 2.6% 0.0% 5.0% 17.8% 17.0% 17.1% 3.8% 7.4%
+1 Operation 1 Operation
+Critical Block
+Transit
+2 3 4 5 3 2 4 5
+Swap the first 6 6
+two operations
+Figure8: AnexampleofstatetransitionusingN neighbourhoodstructure.
+5
+the operation O is now the last operation to be processed on the blue machine. In some cases,
+32
+thestatetransitioninvolvesseveralsteps. Forexample,inFigure8below,givenaprocessingorder
+O → O → O → O on some machine, if we swap O and O (O and O are the first two
+2 3 4 5 2 3 2 3
+operationsofsomecriticalblock),weneedtobreakdisjunctivearcsO → O andO → O ,flip
+1 2 3 4
+theorientationofarcO → O asO ← O ,finally,addnewarcsO → O andO → O . So,
+2 3 2 3 3 1 2 4
+thenewprocessingorderafterthetransitionwillbeO →O →O →O (rightfigure).
+1 3 2 4
+In summary, after the transition, the new disjunctive graph (state) will have a different processing
+orderforthemachineassignedtotheselectedoperationpair,butothermachinesstayunaffected.
+Then, the starting time (schedule) of every operation is re-calculated according to the proposed
+message-passingevaluator(Theorem4.2).
+K THE TOPOLOGICAL RELATIONSHIPS COULD BE MORE NATURALLY
+MODELLED AMONG OPERATIONS IN THE DISJUNCTIVE GRAPH.
+Adisjunctivegrapheffectivelyrepresentssolutionsbyusingdirectedarrowstoindicatetheorderof
+processingoperations, witheacharrowpointingfromaprecedingoperationtoitssubsequentone.
+Theprimarypurposeofthedisjunctivegraphistoencapsulatethetopologicalrelationshipsamong
+the nodes, which are defined by these directional connections. Thus, the disjunctive graph excels
+20
+
+--- PAGE 21 ---
+PublishedasaconferencepaperatICLR2024
+inillustratingtheinter-dependenciesbetweenoperations,incontrasttoothervisualizationmethods,
+suchasGanttcharts,whicharebettersuitedforpresentingexplicitschedulingtimelines.
+Informulatingpartialsolutionswithinaconstructionstep,theagentmustpossessaccuratework-in-
+progressinformation,whichencompassesspecificssuchastheextantloadoneachmachineandthe
+currentstatusofjobsinprocess. Thechallengeencounteredinthisscenariorelatestothedifficulty
+inidentifyingsuitableentitieswithinthedisjunctivegraphthatcanstoreandconveysuchinforma-
+tion effectively. While it is conceivable to encode the load of a machine using numerical values,
+no discrete node within the disjunctive graph explicitly embodies this information. Instead, a ma-
+chine’srepresentationisimplicitanddiscernedthroughthecollectiveinterpretationoftheoperations
+itprocesses,effectivelyformingwhatistermeda’machineclique.’ Thisindirectrepresentationne-
+cessitatesamorenuancedapproachtoensuringthattheagentobtainsthenecessaryinformationto
+constructviablepartialsolutions.
+L RESULT FOR EXTREMELY LARGE INSTANCES
+To comprehensively evaluate the generalization performance of our method, we consider another
+three problem scales (up to 1000 jobs), namely 200 × 40 (8,000 operations), 500 × 60 (30,000
+operations), and 1000 × 40 (40,000 operations). We randomly generate 100 instances for each
+sizeandreporttheaveragegaptotheCP-SAT.Hence,thenegativegapindicatesthemagnitudein
+percentagethatourmethodoutperformsCP-SAT.Weuseourmodeltrainedwithsize20×15for
+comparison. TheresultissummarizedinTable7.
+Table7: Generalizationperformanceonextremelylargedatasets.
+200x40 500x60 1000x40
+CP-SAT 0.0%(1h) 0.0%(1h) 0.0%(1h)
+Ours-500 -24.31%(88.7s) -20.56%(3.4m) -15.99%(4.1m)
+From the results in the table, our method shows its advantage against CP-SAT by outperforming
+itfortheextremelylarge-scaleprobleminstances, withonly500improvementsteps. Thenumber
+in the bracket is the average time of solving a single instance, where “s”, “m”, and “h” denote
+seconds,minutes,andhours,respectively. Thecomputationaltimecanbefurtherreducedbybatch
+processing.
+M ABLATION STUDIES
+In Figure 7(a) and Figure 7(d) (Appendix G), we display the training curves of our method on
+all five training problem sizes and for three random seeds on size 10×10, respectively. We can
+confirmthatourmethodisfairlyreliableandstableforvariousproblemsizesanddifferentrandom
+seeds. We further conduct an ablation study on the architecture of the policy network to verify
+the effectiveness of combining TPM and CAM in learning embeddings of disjunctive graphs. In
+Figure7(b), wedisplaythetrainingcurveoftheoriginalpolicynetwork, aswellastherespective
+ones with only TPM or CAM, on problem size 10×10. In terms of convergence, both TPM and
+CAMareinferiortothecombination,showingthattheyarebothimportantinextractingusefulstate
+features. Additionally,wealsoanalyzetheeffectofdifferentnumbersofattentionheadsinCAM,
+wherewetrainpolicieswithoneandtwoheadswhilekeepingtherestpartsthesame. Thetraining
+curvesinFigure7(c)showthatthepolicywithtwoheadsconvergesfaster. However,theconverged
+objectivevalueshavenosignificantdifference.
+21

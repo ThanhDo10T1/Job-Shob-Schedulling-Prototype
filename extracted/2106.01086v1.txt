@@ -1,0 +1,989 @@
+
+--- PAGE 1 ---
+InternationalJournalofProductionResearch59(2021)11 Received10/2019;Accepted12/2020;Published1/2021
+LEARNING TO SCHEDULE JOB-SHOP PROBLEMS:
+REPRESENTATION AND POLICY LEARNING USING GRAPH
+NEURAL NETWORK AND REINFORCEMENT LEARNING
+JunyoungPark JaehyeongChun SangHunKim
+KAIST KAIST SamsungElectronics
+Daejeon,Korea Daejeon,Korea Suwon,Gyeonggi-do,Korea
+junyoungpark@kaist.ac.kr wogud485@kaist.ac.kr phd.kim@samsung.com
+YoungkookKim JinkyooPark
+SamsungElectronics KAIST
+Suwon,Gyeonggi-do,Korea Daejeon,Korea
+youngkook@samsung.com jinkyoo.park@kaist.ac.kr
+ABSTRACT
+Weproposeaframeworktolearntoscheduleajob-shopproblem(JSSP)usingagraphneuralnetwork
+(GNN)andreinforcementlearning(RL).WeformulatetheschedulingprocessofJSSPasasequential
+decision-makingproblemwithgraphrepresentationofthestatetoconsiderthestructureofJSSP.In
+solvingtheformulatedproblem,theproposedframeworkemploysaGNNtolearnthatnodefeatures
+that embed the spatial structure of the JSSP represented as a graph (representation learning) and
+derivetheoptimumschedulingpolicythatmapstheembeddednodefeaturestothebestscheduling
+action(policylearning). WeemployProximalPolicyOptimization(PPO)basedRLstrategytotrain
+thesetwomodulesinanend-to-endfashion. WeempiricallydemonstratethattheGNNscheduler,
+duetoitssuperbgeneralizationcapability, outperformspracticallyfavoreddispatchingrulesand
+RL-basedschedulersonvariousbenchmarkJSSP.Wealsoconfirmedthattheproposedframework
+learnsatransferableschedulingpolicythatcanbeemployedtoscheduleacompletelynewJSSP(in
+termsofsizeandparameters)withoutfurthertraining.
+Keywords Scheduling·Jobshopscheduling·Jobshopschedulingproblem·JSSP·Graphneuralnetwork·GNN·
+ReinforcementLearning·RL
+1 Introduction
+Schedulingisconsideredasanimportantprobleminbothacademiaandpractice. Thejobshopschedulingproblem
+(JSSP)is, atypeofschedulingproblemthataimstodeterminetheoptimalsequentialassignmentsofmachinesto
+multiplejobsconsistingofseriesofoperationswhilepreservingtheproblemconstraints(processingprecedenceand
+machine-sharing). TheJSSPhasattractedmuchinterestintheresearchcommunity notonlybecauseitcanbeutilized
+asaframeworktoderiveaneffectiveschedulingstrategyformanufacturingsystems,butalsobecauseitcanbeusedasa
+challengingbenchmarkforNP-hardcombinatorialoptimizationproblems[12]indevelopingcombinatorialoptimization
+(CO)algorithms.
+ResearchershassuggestednumerousapproachestosolvetheJSSP.Exactoptimizationapproachessuchasmathematical
+programming[26]andthebranchandboundalgorithm[25],havebeenproposedtosolvetheJSSP.Suchmethods
+guaranteeanoptimalsolutionbutsufferfromthecurseofdimensionality,whichhaspreventedthesemethodsfrom
+beingwidelyappliedinthereal-worldapplications[7]. Thislimitationhasledresearcherstofocusondeveloping
+approximationmethods,whichaimtofindaneffectivebutnotoptimalsolutionwithinreasonablecomputationaltime.
+Thesemethodsmainlyincludeneighborhoodsearchmethodsandprioritydispatchingrules(PDRs). Neighborhood
+Thismanuscriptisareprintedversionofthejournalmanuscriptofsamecontents.
+1202
+nuJ
+2
+]IA.sc[
+1v68010.6012:viXra
+
+--- PAGE 2 ---
+LearningtoscheduleJob-shopproblemswithGNN-RL
+searchmethods,suchasTabusearch[13],simulatedannealing[56],andgeneticalgorithm[15],generatehighquality
+solutionsinreasonablecomputationaltime. However,itisdifficulttoapplythesesearch-basedmethodstothedynamic
+schedulingproblems,wheretheconditionsoftheproblemcontinuouslychange,becausetheyaredesignedtofindthe
+entireschedulingassignmentsforagiveninitialcondition. Therefore,thesemethodsshouldbeappliedagainwhenever
+theconditionsoftheschedulingproblemchange[6],whichisimpracticalinpracticeduetotheextensivetimerequired
+tofindagoodsolution.
+Tocopewithsuchdifficulties,PDRshavebeenextensivelyappliedtoreal-worldmanufacturingschedulingproblems
+[31, 17, 45]. A PDR is a heuristic rule that assigns jobs to machines based on their priorities while considering
+thecurrentstatusofthesystem. ByrepeatedlyapplyingPDRswheneverthestatusofthesystemchanges,onecan
+determineasequenceofjobsastheschedulingprogress. Duetotheirsimplicity, human-interpretableresults, and
+lowcomputationalload, themajorityofindustriesrelyonPDRsmorethanotheroptimizationmethods. However,
+PDRsignorethesequentialnatureofschedulingproblems. AsanextensionofPDR,thecompositedispatchingrules
+(CDR)hasbeeninvestigatedforsolvingdynamicJSSP.theCDRwhoseparameters(theweightofdispatchingrules)
+areoptimizedwithgeneticprogrammingmethodscanyieldaqualifieddispatchingpolicy. [30,46]
+Besidestheapproachesmentionedearlier,machinelearningapproaches,whichespeciallyutilizethefunctionapproxi-
+mationpropertyoftheneuralnetwork,havebeenwidelyinvestigatedtosolvetheJSSPinsupervisedlearning(SL)
+setting[50,49,8]. TheobjectiveoftheSLmethodsistolearnparametersoftheneuralnetworksuchthatthetrained
+networkscanreplicatethebehaviorofpre-existingschedulingmethodssuchasmathematicaloptimizations,search
+methods,PDRs,orCDRs.Ontheotherhand,reinforcementlearning(RL)approacheshavebeenemployedtodetermine
+theschedulingactionsofJSSPwithoututilizinganyexistingmethods. InRLapproaches,ascheduler(oftenRLagent)
+learnsadispatchingpolicythatmapsthecurrentstateofthemanufacturingsystemtotheschedulingactionwhile
+consideringthesequentialnatureoftheproblem. Followingsuchcharacteristics,RLapproachessuccessfullyproducea
+schedulingsolutionofJSSP[4,11,10,24]. Moreover,theRLapproachesoftendiscoverthedispatchingrulesthatare
+superiortotheexistingPDRs[11,10]. However,theseRLmethodstypicallyrequireinstance-by-instancetrainingto
+derivetheschedule,whichentailsdifficultyapplyingthetrainedpolicytoanewJSSP.
+Therehavebeenfewstudiesthatemploygraphneuralnetworks(GNN)tosolveschedulingproblems,suchastraveling
+salesmanproblem(TSP),vehicleroutingproblems(VRP)[23,18,34]. Thesestudiesfirstrepresentaprobleminstance
+intoagraphandemployGNNtotransformthegraphintoasetofnodeembeddingthatsummarizesthestructural
+informationofthetargetproblem. Thepolicyfunctionthentakesthenodeembeddingandproducesthescheduling
+action. BecauseGNNenablestheschedulingpolicytohandlethedifferently-sizedgraph,thetrainedpolicycanbeused
+toproduceschedulingactionsforprobleminstancesindifferentsizes.
+Inthispaper,weproposeaframeworktoconstructtheschedulingpolicyforJSSPsusingGNNandRL.Weformulate
+theschedulingofaJSSPasasequentialdecisionmakingprobleminacomputationallyefficientway. Next,werepresent
+thestateofaJSSPasagraph,consistingofoperationnodesandconstraintedges. Then,weemployaGNNtolearn
+nodefeaturesthatembedthespatialstructureoftheJSSPandderiveaschedulingpolicythatmapstheembeddednode
+featurestoschedulingaction.
+Werepresentthestateofjobshopusingadisjunctivegraph[35,53]. Thedisjunctivegraphspecifiesthestructureof
+JSSPinstance;nodesrepresentoperations,conjunctiveedgesrepresentprecedence/succeedingconstraintsbetweentwo
+nodes,anddisjunctiveedgesrepresentmachine-sharingconstraintsbetweentwooperations. Thegraphrepresentation
+isthenprocessedbyGNN,atypeofneuralnetworkthatlearnstheinteractionamongnodesandedgesofgivengraphs,
+toextractthenodeembedding. BecausethenodeembeddingsummarizesthestructuralinformationoftheJSSPgraph,
+theschedulingpolicythattakesthenodeembeddingasaninputcanyieldgoodschedulingactionwhileconsidering
+theJSSPstructure. SinceGNNlearnshowtoextractthenodeembeddingfromtheinputgraph,theGNN-basedJSSP
+schedulershowsbetterschedulingperformancethanwell-knownPDRsonunseenJSSPinstanceswithoutadditional
+training. Moreover,theGNN-basedschedulershowson-parorevenbetterschedulingperformancesthanthebaseline
+RLmethodsthataretrainedforsolvingspecific-sizeJSSPproblems,againwithoutadditionaltraining.
+We use proximal policy optimization (PPO) [37] algorithm, a variant of policy-based RL, to train the GNN based
+staterepresentationmoduleandtheparameterizeddecision-makingpolicyjointly. PPOupdatestheparametersofthe
+GNNandthepolicyonlywhenthecurrentrepresentationmoduleandthepolicy(locally)improvesthescheduling
+performance. BecausePPOhaveshownthemoststablelearningperformancecomparingtootherRLalgorithmssuchas
+baseline-augmentedpolicygradients[42]andQ-learning[28],thisstudyemploysPPOasprincipallearningalgorithm.
+Insummary,weproposeaframeworkthateffectivelyrepresentstheJSSPstate(representationlearning)andmakes
+theoptimaldecision(policylearning),alongwithanRL-basedtrainingmethodtooptimallytrainthesemodulesinan
+end-to-endfashion. Wewillrefertothederivedscheduleras‘GNNscheduler’. Theproposedframeworkisillustrated
+inFigure1.
+2
+
+--- PAGE 3 ---
+LearningtoscheduleJob-shopproblemswithGNN-RL
+Figure1: Anoverviewoftheproposedframework
+TheschedulingpolicylearnstoconsidertheinherentstructureoftheJSSP,ratherthanlearningthecharacteristicsofa
+specificJSSPinstance. Therefore,thetrainedschedulingpolicycanbedirectlyadoptedtonewJSSPinstanceswithout
+furthertrainingprocess. WeempiricallyshowthattheGNNscheduleroutperformsexistinglearning-basedmethods
+andPDRswhenschedulingforunseenJSSPinstances. Thecontributionsofthispaperaresummarizedasfollows:
+• WeproposeaproblemformulationforJSSPasasequentialdecisionmakingproblemwithgraphrepresentation
+ofthestatetoconsiderthestructureofJSSP.
+• We propose a framework to process JSSP graph state into node embedding using a GNN (representation
+learning)andmakeschedulingactionusingtheconstructedembedding(policylearning).
+• Weproposeeffectivetrainingmethodsforboth(1)GNNbasednodeembeddingand(2)parameterizedpolicy
+usingreinforcementlearninginanend-to-endfashion.
+• WeempiricallydemonstratethattheGNNschedulerforJSSPoutperformspracticallyfavoreddispatching
+rulesonvariousbenchmarkJSSPinstancesandprovidesaneffectiveschedulingsolutiontocompletelynew
+JSSPinstancesthataretoolargetobesolvedwithconventionalsearch-basedalgorithms.
+2 Backgrounds
+2.1 Markovdecisionprocessandreinforcementlearning
+Markovdecisionprocess(MDP)isatuple(S,A,P,R,γ),wherethestatespaceS andactionspaceAdenotethesetof
+statesandactions,respectively;thetransitionprobabilityfunctionP:S×A×S →[0,1]representstheprobabilityofthe
+nextstates ∈S giventhecurrentstates ∈S andactiona ∈A,i.e.,P(s,a,s(cid:48))=P(s =s(cid:48)|s =s,a =a);
+t+1 t t t+1 t t
+therewardfunctionR:S×A×S →[r ,r ]describestheimmediaterewardreceivedaftertransitionfromsto
+min max
+s(cid:48)duetoactiona;andγ ∈(0,1]isthediscountfactor. RLconsidersasequentialdecision-makingproblemasMDP
+andsolvestheMDPbyoptimizingtheBellmanequationsthroughiterativelearningprocedures. TheobjectiveofanRL
+agentistolearnapolicyπ(a |s )thatmaximizestheexpectedcumulativesumoffuturerewards,namelystate-value
+t t
+Vπ(s ). Thedefinitionofstate-valuefunctionisasfollows:
+t
+(cid:34) T (cid:35)
+(cid:88)
+Vπ(s )=E γkR (s ,a ,s(cid:48))) (1)
+t ak∼π t+k k k k
+k=0
+Thestate-valuefunctioncomputestheexpectedcumulativerewardswhenthetargetsystemstartsfromthecurrentstate
+s andisoperatedusingthesequentialactionsselectedbythepolicyπ(a |s ). Theoptimalpolicyπ∗(a |s )isthe
+t t t t t
+policythatmaximizesVπ(s)foralls.
+2.2 Representationlearningongraphstructureddata
+Complexlystructureddatacanbeefficientlyrepresentedasagraph. Agraphisdefinedassetofnodesandedges. Nodes
+represententitiesofdata,andedgesrepresentrelationshipbetweenthenodes. Byutilizingnodefeaturesandtheir
+relationshipcapturedbyedges,representationlearningonagraphaimstoextractoptimumfeatures,calledembeddings,
+forvariousdecisionmakingtasks.
+3
+
+--- PAGE 4 ---
+LearningtoscheduleJob-shopproblemswithGNN-RL
+AGNNisatypeofneuralnetworkthattakesagraphasinputandtypicallyproducesanupdatedgraphwhosenode
+(oredge)featuresareembeddedwiththeconsiderationofedgeconnectivitiesandneighborhoodnodefeatures. A
+GNNismainlycomposedofthreedistinctivemodules: oneforlearningpair-wiseinteractionsbetweennodes;module
+foraggregatinginteractionsandproducinganaggregatedfeaturevector,onemoduleforupdatingnodefeatureswith
+considerationoftheaggregatedfeature[5]. Here,theinteractionmoduleandnodeupdatingmodulearetypicallyneural
+networks.
+Forupdatingatargetnode,aGNNutilizestheinteractionmodulestocomputethepair-wisemessagesbetweenthe
+targetnodeanditsneighborhoodnodes. Itthenutilizestheaggregationmoduletoformasinglevectorfromthereceived
+messages. Finally,itutilizestheupdatingmoduletoproducetheupdatednodeembeddingusingthenodefeatureand
+theaggregatedmessagesasmoduleinput. Byleveragingthelearningcapabilityofneuralnetworks,GNNachieves
+state-of-the-art(SOTA)performanceacrossvariousdomainssuchasper-noderegressiontasks,graphclusteringtasks,
+languagemodelling,andcontrolproblems[32,51,36,55].
+Byconsideringgraphstructureandtheassociatednodefeatures,GNNsachievesnotonlySOTAperformancesbutalso
+learnsgeneralizablenoderepresentations. Duetothepair-wiseinteractionmodule,atrainedGNNcanbeappliedtothe
+newsgraphswhosestructures(thenumberofnodesingraphandtheedgeconnectivities)aredifferentfromthegraphs
+usedfortraining. Asaresult,GNNmodelscansuccessfullyperformtheirtaskswithoutadditionaltraininginvarious
+fieldsincludingrobotcontrol,windpowerestimation,andcity-scaleweatherprediction.[32,48,39]. Weutilizesuch
+transferabilityofGNNstoaccomplishthetransferablepropertyinourJSSPscheduler.
+2.3 Deeplearningforcombinatorialoptimizations
+Deeplearning(DL)approacheshaveshownpromisingresultsforcombinatorialoptimization(CO)problems. DL
+approachesoftenemployaneuralnetworktorepresentthestructureandcharacteristicsoftotheCOproblemitselfora
+sub-stageoftheprobleminthehiddenembeddingandestimatethesolutionsoftheCOproblemusinganotherneural
+networkthatutilizestheembeddings. TheDLapproachesforsolvingCOcanbeclassifiedintwowaysdependingon
+thetrainingscheme: supervisedlearning,andRL.
+In supervised learning settings, a neural network learns a direct mapping from inputs, the CO problem itself or a
+sub-stage of the CO problem, to the pre-computed solution of the target problem. This approaches can generate
+high-quality solutions, comparable even to the mathematical optimization methods, across various CO problems
+[23,18,34]. However,duetotheirsupervisednature,thesemethodsrequirepre-computedoptimalsolutionstotrainthe
+networks. ThisrequirementmakessupervisedlearninglessapplicabletolargescaleCOproblems.
+RLapproachesovercomethelimitationofthesupervisedsettingbyformulatingtheiterativesolution-searchprocessof
+COproblemsasanMDP.IntheMDPformulation,theobjectiveofRLmethodsistolearnthepolicythatgeneratesthe
+sub-solutiononthecurrentstage. Byrepeatedlyapplyingthepolicymappingofthecurrentstage(state)ofatarget
+problemtotheupdatedpartialsolution,RLmethodscangenerateasolutionofCOproblem. Tolearnanoptimalpolicy
+representedasaparametricfunction,RLmethodsutilizetransitionsamples(oftencomposedofsub-stage,sub-solution,
+immediatereward,andthenextsub-stage),whichcanbeeasilycollectedthroughnumericalsimulations. AlthoughRL
+methodsonlyutilizesthetransitionsamplesduringlearning,theycansuccessfullysolvevariousCOproblemswithout
+employingpre-computedoptimalsolutions[27,21,19].
+3 Problemformulation
+3.1 Graphstaterepresentation
+Thedisjunctivegraphg =(V,C∪D)hasbeenusedasaneffectiverepresentationfortheJSSP[35]. Theoperationset
+V containsthejob-shop’soperationswhicharerepresentedasnodesinthegraph. TheconjunctiveedgesetC contains
+theconjunctiveedges,eachofwhichdenotestheprecedenceconstraintbetweentwoconsecutiveoperationsonthe
+samejob. ThedisjunctiveedgesetDcontainsthedisjunctiveedges,eachofwhichrepresentsthemachine-sharing
+constraintbetweentwonodes,i.e.,whentwooperationscanbeprocessedbythesamemachine,thecorresponding
+operationnodesareconnectedwithadisjunctiveedge.
+ThedisjunctivegraphonlycontainsstaticinformationoftheJSSPsuchasprocessingtimesofoperations,precedence
+sharing,andmachinesharingconstraints,failingtoincorporatedynamicallychangingJSSPstateinformation. We
+incorporatenodefeaturesintothenodesingsothatgrepresentthecurrentstateoftheJSSPduringscheduling. The
+nodefeaturex assignedtonodevisasfollows:
+v
+4
+
+--- PAGE 5 ---
+LearningtoscheduleJob-shopproblemswithGNN-RL
+• Nodestatus: one-hotencodedindicatoroftheoperationstatus. [1,0,0],[0,1,0],and[0,0,1]indicatethe
+operationisnotscheduledyet,isbeingprocessedbyamachine,andisfinished,respectively.
+• Processingtime: theprocessingtimeoftheoperation
+• Degree of completion: the degree of completion when the operation v is completed, e.g., the degree of
+completionis0.4forthefirstoperationand0.6forthesecondoperationinthejobcomposedoftwooperations
+whichhave20and30unitprocessingtimes,respectively.
+• Numberofsucceedingoperations: thenumberofsuccessoroperationsinthejobthatincludetheoperationv
+• Waitingtime: thewaitingtimeoftheoperationvonlyaftertheoperationisreadytoprocess.
+• Remainingtime: theremainingtimeoftheoperationtobecompleted. Ithasvalue−1iftheoperationisnot
+scheduledyetoralreadyfinished.
+WerefertotheconjunctivegraphwiththenodefeaturesasthegraphstatefortheJSSP.Weignorethedummynodes
+(sourceandsinknodes)ofthedisjunctivegraphbecausetheyrepresentimaginaryoperationsandthushavenofeatures
+inourgraphformulation.
+3.2 MDPformulationofJSSP
+WeformulateaschedulingprocessofaJSSPinstanceasanMDP.TheproposedMDPisatuple(G,A,P,R,γ). The
+stateg ∈G denotesasnapshotofthejobshopattransitiont. weassumethatg containsallinformationoftheJSSP
+t t
+includingstaticfeaturesanddynamicfeaturesofJSSPwhichresultsfromschedulingdecisions. Notethatthetransition
+indextdoesnotcoincidewiththesimulationtimestamps. Theactiona isaschedulingactionofeither(1)loadingan
+t
+operationtoanavailablemachineatt1or(2)skippingschedulingattbecausenooperationsareeligibletobeprocessed
+(nullactiona ). ThetransitionfunctionPmodelsthetransitionfromthecurrentstateg tothenextstateg dueto
+∅ t t+1
+theactiona . TherewardfunctionRmodelstheimmediaterewardgivenbyasimulatorfromeverytransition. γ isthe
+t
+discountfactor. Theinitialstateisthesnapshotofthejobshopwherenoneofthejobsareprocessed. Theterminalstate
+isthesnapshotwhenalljobsareprocessed.
+3.3 EfficientMDPformulationofJSSP
+WhiletheMDPformulationoftheJSSPsuggestsaframeworktoconsiderthetime-dependentnatureoftheJSSP,
+considerationofalltransitionsisnotcomputationallyattractive. Weobservedthatasignificantnumberoftheunit-time
+transitionsaredrivenbya . Suchtransitionsaretrivialwhenweassumethetransitionmodelisdeterministic. For
+∅
+instance,whenallmachinesareprocessingtheoperations,thetransitionsuntilatleastonemachinebecomesavailable
+willbedrivenbya whileaunit-timetransitioncontinuouslyisaccruing. Fromthisobservation,weproposeanew
+∅
+MDPsetupwhichmodelsthetransitionsonlyduetotheactionsa (cid:54)=a . Wefirstdefinethenon-trivialstatesasthe
+t ∅
+stateswhen(1)atleastonemachineisavailableand(2)amachinehasstrictlymorethanoneoperationreadytobe
+processed. Forbrevity,wewillrefertotheoriginaltransitionsasprimitivetransitionsandnon-trivialstatesasstates.
+Accordingtothenewstatedefinition,weproposethefollowingtransitionmodelandcorrespondingrewardfunction:
+P(g,a,g(cid:48))(cid:44)P(g =g(cid:48)|g =g,a =a) (2)
+τ+1 τ τ
+t=t(τ+1)−t(τ)
+(cid:88)
+R(g ,a ,g )= γtR (g ,a ,g ) (3)
+τ τ τ+1 t t t t+1
+t=0
+t=t(τ+1)−t(τ)
+(cid:88)
+= γtR (g ,a ,g ) (4)
+t t ∅ t+1
+t=0
+Here,τ denotestheindexofthenon-trivialstatetransitionfromtheinitialstate. t(τ)istheindexofprimitivetransition
+whentheτthnon-trivialtransitionhappens.
+Weignoretheprimitivetransitionsandcorrespondingstate-actionpairsbetweentwoconsecutivenon-trivialstates
+becausetheactionsfortheprimitivetransitionsarenull(notethatthecasea = a isnotsubjecttotraining). The
+t ∅
+secondequalityon(3)holdsbecauseonlynullactionsareexecutedbetweentwonon-trivialtransitions.
+1Whenmultiplemachinesareavailableattthtransition,werandomlysamplethemachinesuchthatatransitionalwaysloadsan
+operationtoamachineandweincrementtransitionindext
+5
+
+--- PAGE 6 ---
+LearningtoscheduleJob-shopproblemswithGNN-RL
+Figure2: Overallframeworkforcomputingtheschedulingaction
+TheMDPformulationwithnon-trivialtransitionscanbeseenasaspecialcaseofsemi-MDPformulation[43]withthe
+primitivetransitionsoccuringuntilthenextstateisnon-trivial. Duetothesemi-MDPformulationwiththetransition
+model(2)andtherewardfunction(3),theRLframeworkcansolvetheoriginalMDPwiththepresenceofnon-trainable
+actionsa .
+∅
+4 Methodology
+Inthissection,wedescribetheoverallframeworkincludinghowaschedulingactionisderivedfromthegivenJSSP
+stateg . Theoverallframeworkiscomposedof(1)arepresentationmodulethatgeneratesthenodeembeddingfromthe
+τ
+inputgraphg and(2)adispatchingmodulethattakestheembeddingandcomputestheprobabilitydistributionofthe
+t
+feasibleactionsforthenodesing . TheentireprocedureforthecomputingschedulingactionisillustratedinFigure2
+τ
+4.1 Nodeembeddingprocedure
+Graphnodeembeddingisamethodofrepresentingnodesincontinuousvectorspace,consideringnode/edgefeature
+andpreservingdifferenttypesofrelationalinformationformthegraph. Thenodeembeddingcanthenbethoughtof
+asafeaturevectorcontainingsufficientinformationaboutthetargetnodeanditsrelationalinformationinthegraph,
+whichcanbereadilyusedtoconductvariousend-tasks. Wecomputethenodeembeddingbyiterativelyapplyingan
+embeddinglayer.
+We propose a embedding layer that is designed for explicitly consider the different relations among the nodes in
+the JSSP graphs. The proposed embedding layer maintains four differentiable functions: precedent node updater
+f (·;θ ),succedentnodeupdaterf (·;θ ),disjunctivenodeupdaterf (·;θ ),andtargetnodeupdaterf (·;θ ). The
+p 1 s 2 d 3 n 4
+computationprocedureoftheproposednodeembeddinglayerisgivenasfollows:
+      
+(cid:13) (cid:13)
+h( v k) =f n (k) ReLUf p (k)  (cid:88) h i (k−1)  (cid:13) (cid:13) (cid:13) ReLUf s (k)  (cid:88) h i (k−1)  (cid:13) (cid:13) (cid:13)
+i∈Np(v) i∈Ns(v)
+(5)
+   (cid:13) (cid:32) (cid:33)(cid:13) (cid:13) 
+ReLUf d (k)  (cid:88) h i (k−1)  (cid:13) (cid:13) (cid:13) ReLU (cid:88) h( i k−1) (cid:13) (cid:13) (cid:13) h v (k−1)(cid:13) (cid:13) (cid:13) h( v 0) 
+i∈Nd(v) i∈V
+whereReLU(x)=max(0,x)position-wisely,and(cid:107)isthevectorconcatenationoperator. N (v)andN (v)denotethe
+p s
+precedentandsuccedentnodesetofnodev,respectively. N (v)isthedisjunctiveneighborhoodofnodev. i.e.,theset
+d
+ofnodesconnectedtov bydisjunctiveedges. h(k) isthekth updatedembeddingofnodev. h(0) istheinitialnode
+v v
+featurex bydefinition.
+v
+Theproposedembeddinglayergeneratestheupdatednodeembeddingh(k)whileutilizingsixdifferenttypesofinputs
+v
+thatareforaccountingvariousrelationshipsamongthenodes. Theinputsareasfollows:
+6
+
+--- PAGE 7 ---
+LearningtoscheduleJob-shopproblemswithGNN-RL
+Figure3: GNNwithK embeddinglayersWhitecirclesdenotetheoperations. Straightanddottededgesindicatethe
+conjunctiveedgesandthedisjunctiveedges,respectively. Thesourcenodesofblue,green,andpurplecoloredshadows
+are1,2,and3hopneighborsofthetargetnodev. (Bestshowsincolor)
+• Theprecedentnodeembedding (cid:80) h(k−1). Theprecedentnodeembeddingisusedastheinputofthe
+i∈Np(v) i
+precedentnodeupdaterf (·;θ ). Theprecedentnodeupdaterf (·;θ )generatesanintermediateembedding
+p 1 p 1
+thatcontextualizestherelationshipbetweentargetnodevandtheprecedentnodesinN (v).
+p
+• Thesucceedingnodeembedding (cid:80) h(k−1). Thesucceedingnodeembeddingisusedastheinputof
+i∈Ns(v) i
+thesuccedentnodeupdaterf (·;θ )togenerateintermediatenodeembeddingcapturingtherelationships
+s 2
+betweentargetnodevandthesucceedingnodesinN (v).
+s
+• Thedisjunctivenodeembedding (cid:80) h(k−1). Thedisjunctivenodeembeddingisusedastheinputof
+i∈Nd(v) i
+thedisjunctivenodeupdaterf (·;θ )togenerateintermediatenodeembeddingcapturingtherelationships
+d 3
+betweentargetnodevandthedisjunctivenodesinN (v).
+d
+• Thegraph-levelembedding (cid:80) h(k−1). Thegraph-levelembeddingisusedtoconsidertheentirestatusofa
+i∈V i
+jobshop.
+• Thepreviousembeddingh(k−1). Thepreviousembeddingisusedtodifferentiatethespecificnodevfrom
+v
+othernodesinthegraph.
+• Theinitialnodeembeddingh(0). Theinitialnodefeatureisusedtoconsidertheinitialinputfeatureofthe
+v
+targetnode.
+Using the previous embedding h(k−1) and all the intermediate node embeddings described above, the target node
+v
+updaterfunctionf (·;θ )computestheupdatednodeembeddingh(k).
+n 4 v
+Wesetthenodeembeddingsh(k)aszerovectorswiththesamedimensionsash(k)whenthecorrespondingoperation
+i v
+havefinishedorisnon-exist. Suchmodificationenablestheproposedembeddinglayertocomputethenodeembedding
+withanyJSSPgraphs. Apartfromthecomputationalaspect,thecombinationofzero-vectormodificationandReLU(·)
+encouragesthefeatureupdatersf (·;θ ),f (·;θ ),andf (·;θ )tolearnsparserepresentationsofnodeembedding
+p 1 s 2 d 3
+features [55]. That is, when the input node features do not significantly impact the scheduling performance, the
+embeddinglayerpresumablyprocessesinputnodefeaturesinthesamemannerasnon-existingnodes.
+WeconstructaGNNbystackingKembeddinglayers.ThroughKembeddingiterations,wecancomputetheembedded
+graphg(K) fromtheinputgraphg(0). Thenodefeaturesofg(K) containinformationoftheirK-hopneighborhood
+τ τ τ
+asshowninFigure3. Thegraph-levelembeddingofg(K)providesrepresentationofthegraphsuchthatthegraphis
+τ
+distinguishablefromotherdisjunctivegraphsofJSSPinstances[52]. Forinstance,themagnitudeof (cid:80) h(K)can
+i∈V i
+provideacluetothesize(numberofnodes)ofinputgraphg .
+τ
+4.2 Decisionmakingwithnodeembedding
+ThenodeembeddingscomputedbytheproposedGNNareusedtochoosetheoptimalschedulingaction. Weassume
+that the node embeddings is effective for deciding the optimal scheduling actions. We train the GNN parameters
+toensurethatthecomputednodeembeddingproducesgoodschedulingresults. Thedetailedtrainingprocedureis
+discussedinthenextsection.
+IntheMDPformulationforJSSP,‘actiona ’isassigningoneoftheavailablejobstothetargetmachine. Itisequivalent
+τ
+tochooseoneofthenodes(operations)thatcanbeprocessedbythetargetmachine. Thestateg containsinformation
+τ
+onwhichmachineisavailableattheτthtransition.
+7
+
+--- PAGE 8 ---
+LearningtoscheduleJob-shopproblemswithGNN-RL
+(cid:16) (cid:17)
+Toderivetheschedulingpolicy,weintroduceactorπ a |g(K) . Theactorproducestheprobabilitydistributionover
+τ τ
+theavailable(feasible)operationstobechosenbythetargetmachineusingthesoftmaxfunctionasfollows:
+exp(f (h(K);θ ))
+π(av|g(K))(cid:44) l v 5 (6)
+τ τ (cid:80) exp(f (h(K);θ ))
+u∈Agτ l u 5
+wheref (·;θ )isadifferentiablefunctionthatmapsnodeembeddingstothelogitvaluesofeachnodeandA =
+l 5 gτ
+{av ;v ∈processiblenodesatτ}istheprocessibleactionset2. Oneofthefeasibleschedulingactionsisthenselected
+τ
+fromthisstochasticpolicy.
+Fromourexperience, weconfirmedthatJSSPshavemultiple(sub)optimalschedulingtrajectories. Theproposed
+stochasticpolicyallowstheactortoexploremultiple(sub)optimalschedulingtrajectoriesandchoseoneofthem.
+Totraintheschedulingpolicyπ(av|g(K)),weemployproximalpolicyoptimization(PPO)[38],apolicygradient-based
+τ τ
+reinforcementlearningalgorithm. SincethePPOalgorithmusesacriticthatapproximatesthestatevalueofanMDP,
+herewepresenttheformofthecriticfunction(thedetailedprocedurehowtheparametersofthepolicyandthecritic
+alongwiththeparametersofGNNwillbediscussedinthenextsection). Weapproximatethestate-valuebyusingcritic
+(cid:16) (cid:17)
+V g(K) asfollows:
+τ
+(cid:32) (cid:33)
+Vπ (cid:16) g(K) (cid:17) ≈V (cid:16) g(K) (cid:17) =f (cid:88) h(K);θ (7)
+τ τ v i 6
+i∈V
+where (cid:80) h(K)isgraph-levelembedding,andf (·;θ )isadifferentiablefunction.
+i∈V i v 6
+5 Trainingprocedure
+Inthissection,wedescribethetrainingprocedureoftheproposedGNNanddecisionmakingmodules. Theparameters
+ofmodelΘ={θ ,θ ,θ ,θ ,θ ,θ }areoptimizedusingRLframework. TheRLframeworkrequiresthesampleof
+1 2 3 4 5 6
+transitions(g ,a ,r ,g )totrainthemodelparameters. Wecollectthesamplesoftransitionsbysimulatingjob
+τ τ τ τ+1
+shopusingourowndevelopedJSSPsimulator.
+5.1 pyjssp: MDPformulatedJSSPsimulator
+Thesimulatorhandlesnotonlythestatetransitioninducedbytheschedulingaction, butalsotransformationfrom
+the state of the JSSP instance to the corresponding disjunctive graph. Moreover, according to the proposed MDP
+formulation,thesimulatorautomaticallytransitsthetrivialactionsuntilanon-trivialeventoccursandcomputesthe
+cumulativereward,R(g ,a ,g ). ForsimulatingthisparticularJSSP,weimplementedasimulator,pyjssp3. The
+τ τ τ+1
+simulatoremitsatransitionsample(g ,a ,R ,g )foreverynon-trivialschedulingaction.
+τ τ τ τ+1
+5.2 Designofrewardfunction
+We aim to learn a scheduling policy that minimizes the makespan C . C is the maximum completion time
+max max
+amongjobs,i.e.,thetotallengthoftheschedule(C = max C ). Totraintheschedulingpolicytominimize
+max j∈J j
+C ,weemploythewaiting-jobrewardfunctionasfollows:
+max
+r(g ,a ,g )=−(thenumberofwaitingjobsattimet) (8)
+t t t+1
+Thewaiting-jobrewarddesignisadequateforachievingaminimalmakespan. Maximizingthecumulativesumof
+rewards,i.e.,minimizingthecumulativesumofthenumberofwaitingjobs,isstronglyassociatedwithminimizingthe
+makespan[33].
+ThesuggestedrewardrepresentationisbeneficialfortrainingtheproposedmodelwiththeRLalgorithm. Thewaiting-
+jobrewardsarewell-definedineverytransitions; thus,theRLalgorithmwillfrequentlyobtainmeaningfulreward
+signalduringtraining. Ontheotherhand,themakespanrewardwillberealizedonceonlywhenthegiveninstanceis
+finished;asaresult,theRLalgorithmhasdifficultyinassigningcredittotheactionsintheepisodeduringtraining.
+2Weoverloadthenotationofactiona asav toclearlyshowthattheactionis‘selectingthenodev’.
+τ τ
+3Referthewebpagehttps://pypi.org/project/pyjssp
+8
+
+--- PAGE 9 ---
+LearningtoscheduleJob-shopproblemswithGNN-RL
+5.3 Reinforcementlearningalgorithm
+Weemployproximalpolicyoptimization(PPO)[38],whichisapromisingvariantofthepolicygradientmethod,to
+traintheproposedmodel. PolicygradientmethodsoptimizethepolicybyupdatingparametersetΘinthedirectionof
+thegradientoftheobjectivefunction∇L(Θ):
+Θ =Θ +η∇ L(Θ) (9)
+new old Θ
+whereL(Θ)=Eˆ (cid:2)(cid:80) π (a|s)Aπ(s,a) (cid:3) ,andηisthelearningrate.
+s∼dπ a∈A Θ
+Whenupdatingparameterswiththeoriginalpolicygradientmethod,smallchangesintheparameterspaceoftenleadto
+substantialchangesinthepolicyspace,whichresultsinunstabletraining. Inparticular,duringjobshopscheduling,this
+propertyiscriticalbecausethestateoftheJSSPcannotrelapseintothepreviousstate,andasingleactionsignificantly
+affectstheperformanceoftheschedule. Therefore,toovercomethisdrawbackofpolicygradientmethods,trustregion
+policyoptimization(TRPO)[37]hasbeenproposedtolimitthesizeofpolicyupdatebetweenΘ andΘ using
+old new
+aKLdivergenceconstraint. However, employingTRPOrequiressolvingaconstrainedoptimizationtoupdatethe
+parameters,whichiscomputationallydemanding. Asanalternativeapproach,PPOsimplifiesthisconceptbyusinga
+clippedsurrogateobjective.PPOupdatestheparametersoftheGNNandthepolicyonlywhenthecurrentrepresentation
+andthepolicymodule(locally)improvetheschedulingperformance. Specifically,theclippedsurrogateobjectiveis
+definedas:
+(cid:104) (cid:16) (cid:17)(cid:105)
+LCLIP(Θ)=Eˆ min r (Θ)Aˆ ,clip(r (Θ),1−(cid:15),1+(cid:15))Aˆ (10)
+τ τ τ τ τ τ
+wherer (Θ)= π(aτ|gτ;Θnew) andΘ={θ ,θ ,θ ,θ ,θ ,θ }.
+τ π(aτ|gτ;Θold) 1 2 3 4 5 6
+Thefunctionclip(r (Θ),1−(cid:15),1+(cid:15))limitsr (Θ)within[1−(cid:15),1+(cid:15)],andAˆ isthegeneralizedadvantageestimation
+τ τ τ
+functiondefinedasfollows:
+Aˆ =δ +(γλ)δ +···+(γλ)T−τ−1δ (11)
+τ τ τ+1 T−1
+whereδ =r +γV (g ;Θ)−V (g ;Θ),andT istheterminationstepoftheepisode.
+τ τ τ+1 τ
+Inaddition, wecombineavaluefunctionerrorandentropybonustermwiththeobjectivefunctiontoenhancethe
+trainingperformance. Theadvantagefunctioncanindicatethecorrectdirectioninwhichtoupdatetheparameterswhen
+theestimationofthevaluefunctionisaccurate. Theentropybonusencouragessufficientexplorationduringtraining.
+Thus,thecombinedobjectivefunctionisasfollows:
+Lt τ otal(Θ)=E (cid:98)τ (cid:104) LC τ LIP(Θ)−α (cid:0) V (g τ ;Θ)−V τ targ(cid:1)2 +βS τ (π Θ ) (cid:105) (12)
+whereS (π )=− (cid:80) log(π (a))π (a)denotestheentropyofcurrentpolicyπ atτ;Vtarg = (cid:80)T r isthe
+τ Θ a∈Agτ Θ Θ Θ τ i=τ i
+realizedsumofrewards;andαandβ arecoefficients.
+ThePPOalgorithmmaximizes(12)byupdatingthesetofparametersΘinthedirectionsuggestedby∇ Ltotal(Θ). By
+Θ τ
+repeatedlyupdatingthesetofparameters,theactorpolicyπ (a |g )istrainedtomaximizetheexpectedcumulative
+Θ τ τ
+sumofrewardsV(g ;Θ).
+τ
+5.4 Trainingdetails
+Here,wedetailthehyper-parametersusedduringtraining. Acrossthemodels,weusemulti-layerperceptrons(MLP)
+withtwohiddenlayersof256ReLU[14]activationunitsandappropriateinputandoutputdimensionstocompute
+embeddings,logitsofnodes,orvalueofgraphs. 4 IntheGNN,theprecedent,succedent,anddisjunctivenodeupdaters
+f(k)(·;θ ),f(k)(·;θ ),andf(k)(·;θ )have8-dimensionalinputsandoutputs.Asaresult,thenodeupdaterf(k)(·;θ )
+p 1 s 2 d 3 n 4
+has48-dimensionalinputandproduces8-dimensionalnodeembeddings.
+Thedecisionmakingmodules(actorandcritic)alsoemployMLPstocomputethelogitsandvaluesofthegivenJSSP
+graph. f (·;θ )andf (·;θ )take8-dimensionalinputsandreturnscalarvalues. Wesetthenumberofembedding
+l 5 v 6
+iterationsasK =3. K controlsthescopeofinformationpropagationwhencomputingnodeembeddings;thenode
+embeddingofthetargetnodeiscomputedusingtheothernodeembeddingsofK-hopneighborhoodnodes. Whenlarger
+4ReLUnetworkisastandardbuildingblockforcomplexneuralnetworks.Choosing2nnumberedhiddenlayersisalsostandard
+practiceinthedeeplearningcommunity.Similarly,wesetthedimensionofhiddennodeembeddingas23.Wetesteddeeperand
+thickerReLUnetworkswhilefindingthebesthyperparameters.ThedeepandthickReLUnetworksthanthespecifiedhyperparameter
+setupdidnotimproveschedulingperformance.
+9
+
+--- PAGE 10 ---
+LearningtoscheduleJob-shopproblemswithGNN-RL
+Table1: PPOhyperparameterusedfortrainingtheGNNscheduler
+Hyperparameters Value
+Optimizer Adam[20]
+LearningRate(η) 2.5×10−4
+Discountfactor(γ) 1.0
+GAEparameter(λ) 0.95
+Clippingparameter((cid:15)) 0.2
+valuefunctioncoefficient(α) 0.5
+Entropybonuscoefficient(β) 0.01
+Numberofepisodesperupdate(n) 20
+K isused,theGNNmodulecancomputethetargetnodeembeddingwhileconsideringmorehigh-orderinteractions
+amongthenodes. However,weexperimentallyconfirmedthatK largerthanthreedoesnotsignificantlyimprovethe
+GNNscheduler’sschedulingperformancebutonlyrequiresmorecomputations. WeverifiedK =3wasenoughfor
+evenourlargesttestingJSSP,whichhas20machinesand100jobs,becausedisjunctivegraphsaredenselyconnected.
+Werandomlygeneratetheinitialgraphg andperformsschedulingtocollecttransitionsamples(g ,a ,r ,g ). The
+0 τ τ τ τ+1
+initialstatedistributionP (G )randomlygeneratesg byspecifyingthenumberofmachinesmdrawnfromauniform
+0 0 0
+integerdistributionbetween5and9,i.e.,m∼U(5,9),andthenumberofjobsn∼U(m,9)andsampleprocessing
+timesfromU(1,99). Werandomlypermutetheorderofmachinesandassignamachinetooperationsofajobsuchthat
+operationsofajobareprocessedbydifferentmachines.
+Wecollectthetransitionsamplesfrom20episodeswiththe20JSSPinstancesusingthecurrentschedulingpolicy.
+Aftersamplecollection,weupdateΘwiththePPOalgorithm. Foreveryfiveupdates,weregenerateanotherrandom20
+JSSPinstance. Weterminatethetrainingprocedurewhenthemakespanofthevalidationsetconverges. Wepreparethe
+validationinstancesgeneratedthroughp (G ). Theoptimalsolutions(minimummakespan)ofthevalidationinstances
+0 0
+arecomputedthroughtheGoogleORtool[1]. Algorithm21describestheentiretrainingprocedure.
+The hyperparameters of the PPO algorithm can affect the performance of the trained scheduling policy. Table 1
+summarizethehyperparameters ofthePPOalgorithm, whosevalues arecarefullyselectedtoachievereliableand
+goodperformanceinthevalidationJSSPinstances. Forthelearningrateη,GAEparameterλ,clippingparameter(cid:15),
+valuefunctioncoefficientα,andentropybonuscoefficientβ,weusedthesamevaluessuggestedby [16]. Thissetof
+hyperparametervaluesiswidelyknownforworkinggenerallywellforvariousproblems.
+We modify two hyperparameters, discount factor γ, and the number of episodes per gradient updates n, explicitly
+considering the characteristic of the JSSP scheduling problem. We set γ as 1.0 since the target JSSP problem is
+formulatedasafiniteMDP.Besides,wesetthenumbernofepisodesperparameterupdateas20suchthatthePPO
+algorithmreliablyestimatesthestatevalueandcomputethegradientfromit. Duetothecombinatorialnatureofthe
+JSSP,singleactionintheearlyphaseofMDPcaninduceaconsiderabledifferenceintheresultofaremainingMDP.
+Thus,itisessentialtouseenoughnumberoftheepisodewhenupdatingtheparameter. Fromaseriesofexperiments,
+wehaveobservedthatwhennislessthan20,thecomputedstatevaluehasalargevariance,whilewhennisover20,
+theperformancegainisnotsignificant. Thus,toachievethebestperformancewhilereducingthecomputationalburden,
+weusedn=20.
+6 Experiments
+ThetrainedGNNschedulercanscheduleanyJSSPwithoutinstance-by-instancetraining. Totestthegeneralization
+performance over JSSP instances, we measured the scheduling performances over different sets of unseen JSSP
+instances. TheoveralltestschemeisdescribedinFigure 4. Tothebestofourknowledge,nolearning-basedJSSP
+schedulerisabletoscheduleonanewJSSPinstancethatisdifferentfromthetrainingJSSPinstancesintermsofsize,
+constraints,andprocessingtimes. Consequently,wecomparedthegeneralizationperformanceofourmodelwiththe
+followingPDRs:
+• FirstInFirstOut(FIFO):Thefirstjobinisprocessedfirst.
+• LastInFirstOut(LIFO):Thelastjobinisprocessedrfirst.
+• ShortestProcessingTime(SPT):Thejobwiththeshortestprocessingtimeisprocessedfirst.
+• LongestProcessingTime(LPT):Thejobwiththelongestprocessingtimeisprocessedfirst.
+10
+
+--- PAGE 11 ---
+LearningtoscheduleJob-shopproblemswithGNN-RL
+Algorithm1:TrainingprocedurefortheGNNscheduler
+Result: theTrainedGNNscheduler
+1 generatenJSSPinstanceswiththeinitialgraphsg 0 ∼P 0 (G 0 )
+2 foriteration=1,2,...do
+3 forepisodei=1,2,...ndo
+4 whiletheepisodeisnotterminateddo
+5 ifthecurrentstateisnon-trivialstatethen
+6 observeR τ−1 andg τ
+7 collecttransitionsample(g τ−1 ,a τ−1 ,R τ−1 ,g τ )
+8 executionactiona τ ∼π Θ (·|g τ )
+9 end
+10
+ComputethegeneralizedadvantageestimatesAˆ
+1
+,...Aˆ
+T
+11 end
+12 end
+13 Computetotalobjectivefunction,Ltotal(Θ)= (cid:80)n i=1 (cid:80)T τ=1 Li τ (Θ)
+14 Updateallparameters,Θ←Θ+η∇ Θ Ltotal(Θ)
+15 ifEvery5gradientupdatesthen
+16 RegeneratethenJSSPinstanceswiththeinitialgraphsg 0 ∼P 0 (G 0 )
+17 end
+18 ifvalidationperformanceconvergesthen
+19 Terminatetrainingprocedure
+20 end
+21 end
+• ShortestTotalProcessingTime(STPT):Thejobwiththeshortesttotalprocessingtimeisprocessedfirst.
+• LongestTotalProcessingTime(LTPT):Thejobwiththelongesttotalprocessingtimeisprocessedfirst.
+• LeastOperationRemaining(LOR):Thejobwiththeleastremainingoperationstobecompletedisprocessed
+first.
+• MostOperationRemaining(MOR):Thejobwiththemostremainingoperationstobecompletedisprocessed
+first.
+• LeastQueueNextOperation(LQNO):Thejobwhosenextoperationhastheleastwaitingjobsisprocessed
+first.
+• MostQueueNextOperation(MQNO):Thejobwhosenextoperationhasthemostwaitingjobsisprocessed
+first.
+• Random: Jobpriorityisrandomlyassigned.
+Pleasenotethatwehaveincludedasetofwell-knownPDRsasbaselinealgorithmstocomparetheperformanceofthe
+proposedRL-basedapproach. Althoughtherearesophisticatedpriorityrulessuchasasearch-algorithmoptimizedCDR
+[30,46],wehavenotconsideredsuchalgorithmsbecausetheseapproachesrequireapplyingsophisticatedoptimizations
+orsearchbasedmethodstofindtheoptimummixingratioofvariousPDRs. FindingthebestCDRisbeyondthescope
+ofthecurrentstudy. Thepresentstudy’sfocusistoempiricallyinvestigatethepotentialoftheRL-basedapproachfor
+derivinganefficientdynamicdispatchingruleforJSSP,ratherthanseekingthealgorithmthathasthebestperformance.
+ThekeyadvantagesoftheRL-basedapproachoverthePDRandCDRarethatitlearnshowtoadaptivelyutilizevarious
+statefeaturesindeterminingtheoptimalschedulingactions,whilePDRsandCDRsconstantlyusethepredetermined
+samestatefeaturesinmakingthenextschedulingactions. Dynamicallyextractingthemostrelevantfeaturesoutof
+thecurrentstateandmappingthesefeaturestotheoptimalactioncanbeanalogoustousinganinfinitenumberof
+PDRs(becausetheRLapproachdoesnotspecifythesetoffeaturesbutadaptivelyconstruct)orusingCDRswith
+dynamicallyvaryingmixingratios(becausetheRLapproachconsidersdifferentaspectsofthecurrentstateoftheJSSP
+indecision-making). Theseflexibilityandadaptabilityaretheessentialfactorsimprovingtheperformance. TheGNN
+basedstaterepresentationmodulefurtherstrengthenstheflexibilityandadaptabilitybyconsideringrelationshipsamong
+machinesandtasks.
+11
+
+--- PAGE 12 ---
+LearningtoscheduleJob-shopproblemswithGNN-RL
+Figure4: Testschemetomeasuregeneralizationperformance
+WeevaluatedtheschedulingperformanceofaschedulerforaJSSPinstancebycomputingtherelativeschedulingerror
+definedasfollows:
+(cid:32) (cid:33)
+Cˆ
+(cid:15)= max −1 ×100(%) (13)
+C∗
+max
+where Cˆ is the makespan derived from the scheduling solution and C∗ is the optimum makespan. When a
+max max
+schedulerachievesanoptimalschedule,therelativeschedulingerror(cid:15)becomes0%.
+Weconductedthreeexperiments. TheexperimentsweredonewiththeGNNschedulerthatispre-trainedasdescribed
+insection5withoutadditionaltraining,i.e.,zero-shotsetting,asillustratedinFigure4. First,weevaluatedhowwellthe
+GNNschedulerwastrainedusingrandomJSSPinstancesonatestdatasetcomposedofJSSPinstancessampledbythe
+samedistributionusedtogeneratetrainingJSSPinstances. Secondly,weevaluatedhowwelltheGNNschedulertrained
+inthefirstexperimentperformedonvariousbenchmarkJSSPinstancesreportedintheliterature. Lastly,weinvestigated
+therelativecompetenceoftheproposedGNNschedulercomparedtootherRL-basedschedulersbyemployingour
+methodontestdatasetsthattheRL-basedschedulerswereevaluatedon. Forallthreeexperiments,weusedvarious
+PDRstocomparetheperformanceoftheproposedmethod.
+6.1 Performanceevaluationontestingdistribution
+WemeasuredtheperformancesofthetrainedGNNschedulerandPDRsoverthe100testinginstancessampledfrom
+P (G ),whichwereusedtogeneratetraininginstances. Thetestinginstancesareaccessiblefromthepyjssppackage
+0 0
+withtheoptimalsolutions.
+TheproposedscheduleroutperformedallPDRsonthetestinstances,asshowninFigure5. ThetrainedGNNscheduler
+achieved14.7%averagerelativeerroronthetestinstances. AmongtheseveralPDRswetested,onlyMORachieveda
+comparableperformancewiththeproposedGNN.TherelativeschedulingerrorsoftheotherPDRswereallover20%.
+ThisresultindicatesthattheproposedschedulerprovidesbetterschedulesthanallPDRswhensolvingJSSPsgenerated
+bythedistributionusedtogenerateJSSPinstancesfortraining.
+Inapracticalsense,thedistributionP (g )usedtogeneratethetrainingandtestJSSPinstancesisnotgeneralenough
+0 0
+tocoverreal-worldJSSPs. Inthefollowingsections,weshowthattheGNNschedulertrainedonthisJSSPdistribution
+performswellonJSSPswhosesizesaremuchlargerthanthetraininginstancesandwhosedistributionsofprocessing
+timeandmachineorderaredifferent.
+6.2 PerformanceevaluationonBenchmarkProblems
+Inthissection, weanalyzetheperformancesoftheGNNscheduler, trainedusingthetrainingsetdescribedinthe
+previoussection,onthefollowingbenchmarkjobshopproblems: ORB01-10[3],SWV01-20[41],FT06/10/20[9],
+LA01-40[22],ABZ5-9[2],YN1-4[54],andTA01-80[44]. ThenumbersofmachinesandjobsofaJSSPinstancein
+thebenchmarksetsrangefrom5to20and6to100,respectively. Eachsetofbenchmarkinstancesfollowsadifferent
+12
+
+--- PAGE 13 ---
+LearningtoscheduleJob-shopproblemswithGNN-RL
+Figure5: AveragerelativeschedulingerrorsonthetestingsetBarchartsdescribetheaveragerelativeerrorofthe
+GNNschedulerandPDRs. Theverticalerrorbarsindicateonestandarddeviationoferrors(thestatisticsarecomputed
+from100simulations).
+distributionforgeneratingJSSPinstances. ReferappendixAtofinddetaildescriptionaboutthegeneratingdistribution
+ofbenchmarks.
+Usingthebenchmarkinstances,weinvestigatedhowwellthetrainedGNNschedulersolvedcompletelynewJSSP
+instanceswhosesizesandothercharacteristicswerecompletelydifferenttothoseofthetrainingJSSPinstances. For
+somelarge-sizeJSSPbenchmarks,therearenoexactsolutionsfoundintheliterature[47]. Instead,thelowerbound
+andupperboundofthemakespanareonlyknown. Forsuchcases,weconsiderthemeanvalueofthelowerboundand
+upperboundoftheJSSPinstanceasC∗ .
+max
+Figure6[Left]showstheaveragerelativeerroroftheGNNscheduleroneachbenchmarksetcomparedtothePDRs.
+TheGNNscheduleryieldedqualitysolutionswhoseaveragerelativeerrorsrangedfrom12.6%to20.9%. Exceptthe
+ABZandTAbenchmarkJSSPs,therelativeerrorsofthetrainedGNNschedulerwerethelowest. InthecasesofABZ
+andTA,thedifferenceinrelativeerrorbetweenourschedulingpolicyandthebestPDRwaswithin0.1%.
+TheresultsofthetrainedGNNschedulerwithrespecttothesizeofJSSParepresentedinFigure6[Right]. Weexcluded
+the6×6(6machinesand6jobs)instancesfromtheperformanceevaluationbecausethebenchmarkJSSPwiththatsize
+isonlyFT06. Figure6[Right]showsthattheproposedGNNscheduleralsoobtainedstrongperformancesoverall
+JSSPsacrossallsizescomparedtothePDRs. Ourschedulerrankedbestinallbuttwosizeofinstances,whereitranked
+secondforthecasesof20×30and20×50,with4.4%and2.7%gapsinrelativeerrorfromthebestPDR,respectively.
+From the experiment on the benchmark instances, we can confirm that the proposed GNN scheduler is relatively
+robusttovariationsofproblemdistributionandsizecomparedtoPDRs. PDRsscheduleoperationsaccordingtoa
+pre-determinedrulewithoutconsideringtheJSSPstructure. Therefore,thequalityofschedulingsolutionsfromPDRs
+mayfluctuatedependingonthepropertiesoftheparticularJSSP.Forexample,theMORandFIFOrulesgenerally
+performedwell,buttheirschedulingperformancesdeterioratedsignificantlyontheSVWbenchmarkproblems. In
+contrast,ourGNNschedulerreliablygeneratedthehigh-qualityschedulingsolutionsforvarioustypesofJSSPs. This
+resultimpliesthattheproposedgraphembeddingalgorithmenablestheschedulingalgorithmto(1)extracteffective
+featuresrepresentingthecurrentstateofJSSPregardlessofitssizeandprocessingtimeand(2)deriveabetterscheduling
+action.
+Alsonotethat, asshowninFigure6, theerrorscoreoftheproposedmethodvariessignificantlydependingonthe
+benchmarkinstances. Thelargefluctuationoftheerrorscoreispossiblycausedby(1)thecharacteristicofaJSSP
+problemand(2)thelargevariabilityinthedifficultylevelofthebenchmarkinstances. Becausetheoptimumsolution
+ofaJSSPisrepresentedasauniquesequenceofassignments,evenasinglechangeintheorderofassignmentscan
+induceaconsiderableperformancedegradation,whichisatypicalpropertyofafunctiondefinedoverhigh-dimensional
+13
+
+--- PAGE 14 ---
+LearningtoscheduleJob-shopproblemswithGNN-RL
+Figure6: Averagerelativeschedulingerroronthebenchmarks[Left]Comparisonforbenchmarktype. [Right]
+Comparisonforinstancesize. RedballsindicatetheaveragerelativeschedulingerrorsoftheGNNscheduler. Orange,
+green,andpurplemarksindicatetheaverageerrorsofleadingPDRs: MOR,SPT,andFIFO,respectively(Bestshows
+incolor).
+combinatorialactionspace. Furthermore,thisperformancedegradationstronglydependsonthestructureofaJSSP(i.e.,
+thedistributionofnumbersforjobsandmachines,andthedistributionoftaskcompletiontime). Thisargumentcanbe
+supportedbythefactthattheerrorfunctionpatternsoverthebenchmarkinstancesaresimilarforallthealgorithms,
+including the proposed one. For instance, the scheduling algorithms generally have a low level of an error on LA
+instances,whiletheschedulingalgorithmshaveahighlevelofanerroronSVWandFTinstances.
+6.3 Comparisonofgeneralizationperformanceforlearning-basedschedulers
+TherehasbeensomeresearchondevelopingRL-basedschedulersforJSSPs[4,11,10,24]. However,onlyfewof
+them,suchasmulti-agentreinforcementlearning(MARL)[10]andmulti-classDQN(MDQN)[24],haveshownthat
+thetrainedRL-basedschedulercanbeusedtoschedulenewJSSPinstances. Thedetailsofthesetransferabilitytests
+foundintheliteraturearesummarizedinTable2. TwoMARLschedulersweretrainedwith5×15and10×10instances
+andtestedonLA06-10andORB01-10instances,respectively[22,3]. TheMDQNschedulerwastrainedwith15×20
+instancesandtestedonDMU01-05andDMU41-45instances[40]. Wecomparedtheschedulingperformanceofthe
+proposedGNNschedulerwiththoseoftheRL-basedschedulers. Notethatthetrainingandtestdatasetshadthesame
+sizesofmachinesandjobs. Therefore,onlyalimitedgeneralizationtestcouldbeconductedforthecasewherethe
+conjunctiveconstraintsandprocessingtimesaredifferentfromthetrainingandtestdatasets.
+Tomimictheexperimentalproceduresreportedin[10]and[24],wetrainedthethreeGNNschedulers(GNN ,GNN ,
+1 2
+andGNN )withthetrainingJSSPinstanceswithsizes5×15,10×10and15×20,respectively. Wethenemployed
+3
+thethreetrainedGNNschedulersonthetestdatasetshowninTable2. Furthermore,toinvestigatethegeneralization
+performanceoftheproposedmethod,weemployedtheGNNschedulerthatwasusedforthepreviousexperiment,
+GNN ,totesttheJSSPinstanceslistedinTable2.
+0
+Figure7showsthattheproposedschedulers(GNN ,GNN ,andGNN )gavethelowesterrorsforeachtestdataset
+1 2 3
+whenthetrainingandtestdatasetscontainedJSSPinstanceswhosesizeswerethesamebutwhoseprocessingtimes
+andorderdistributionsweredifferent. Inparticular,theGNNschedulersperformedsignificantlybetterthantheother
+learningmodels. Also,GNN trainedwithrandomJSSPswhosegeneratingdistributionsweredifferentfromthetest
+0
+14
+
+--- PAGE 15 ---
+LearningtoscheduleJob-shopproblemswithGNN-RL
+Table2:GeneralizationtestsetupsfortheRL-basedschedulers,MARL[10]andMDQN[24]Bothmethodscould
+scheduleJSSPinstanceswhosenumbersofmachinesandjobsarethesameasthoseforthetraininginstances. The
+performanceoftheMARLmethodwasevaluatedusingk-foldcrossvalidationschemeonbenchmarkinstances. Each
+trainingfoldexcludedthetestinstanceforthetrainingset. ThetrainingsetforMDQNwasnotpreciselyreported.
+RLscheduler Trainingset Testset Instancesize
+MARL(5x15) LA06-10 LA06-10 5x15
+MARL(10x10) ORB01-10 ORB01-10 10x10
+MDQN(15x20) N/A DMU41-45 15x20
+(a)ComparisonwithMARL (b)ComparisonwithMARL (c)ComparisonwithMDQN
+approachonLAinstances approachonORBinstances approachonDMUinstances
+Figure7: PerformancecomparisonwithotherRL-basedJSSPscheduler
+datasetwasstillabletoschedulealltestJSSPswithslightlyincreasederrorcomparedwithGNN ,GNN ,andGNN .
+1 2 3
+BasedontheobservationthattheperformancegapsbetweenGNN andGNN (i∈1,2,3)aresmall,wecanconclude
+0 i
+thatthenodeembeddingschemelearnedfromsmallsizedJSSPscanbegeneralizedtosolvelarge-sizedJSSPs. This
+propertyisindeeddesirableinthattheGNNschedulertrainedonasetofsmallJSSPinstancescanbedirectlyusedto
+schedulelargeJSSPinstancesthatareimpossibletosolvewithconventionalmodels.
+7 Analysisoncomputationalcomplexity
+WeinvestigatethecomputationalcomplexityoftheproposedmethodfordifferentsizesofJSSPinstances. Thenumber
+ofcomputationsforembeddingnodefeaturestypicallyincreasesasthesizeoftheJSSPinstancegrows. Toquantify
+thisrelationship,weusetwofactors,thenumberofmachines,m,andthenumberofjobs,n,andinvestigatetheimpact
+ofeachfactoroncomputationalcomplexity. Weconducttwofoldsofexperiments: (1)fixingmandvaryingn,(2)
+varyingm,andfixingn.
+Figure 8 show the result of the empirical complexity analysis. The left figure shows how the computational time
+increasesasthenumberofjobsincreases(whilefixingthenumberofmachines). Incontrast,therightfigureshows
+how the computation time increases with the number of machines. As the fitted second-order polynomial curve
+y =0.0125n2−0.1857n+0.7543withR2 =0.9984represents,thecomputationaltimeislikelyproportionaltothe
+squareofthenumberofjobs. Also,asthefittedfirst-orderpolynomialcurvey =4.2857m−21.598withR2 =0.9815
+15
+
+--- PAGE 16 ---
+LearningtoscheduleJob-shopproblemswithGNN-RL
+Figure8: computationaltimesonvaryinginstancesizes[Left]Computationaltimesalongthenumberofoperations
+inJSSPgraphs. [Right]ComputationaltimesalongthenumberofjobsinJSSPgraphs. Werandomlygenerate20
+JSSPinstancesofeachsizeandsolvestheproblemswiththeproposedmethodtoestimatethemeanandstandard
+deviationofcomputationtimes. Thebluemakersandticksshowthemeanandstandardderivationofcomputational
+times of the proposed GNN scheduler, respectively. Grey lines show fitted trends. Additionally, we compares the
+computationtimesofthethreeleadingPDRs;MOR,SPTandFIFO.Theorange,green,andredmakersshowsthemean
+computationaltimesofMOR,SPT,andFIFO,respectively. WemeasurethecomputationaltimesonaCPUmachine,
+whichisequippedwithIntel(R)Core(TM)i9-7900XCPU@3.30GHz. (Bestshowsincolor)
+indicates,thecomputationaltimeseemstobeproportionaltothenumberofthemachines. Theseresultsaresupported
+bythefactthatthenumberofedgesinaJSSPgraphisproportionalton2+nm.
+AsshowninFigure 8,theproposedGNN-schedulerrequiresmorecomputationaltimethanPDRs. TheGNN-scheduler
+needs to compute the node embedding by employ GNN before making the scheduling action, while PDRs do not
+computeanyfeatures. Thecomputationaltimegapsgenerallyincreasewiththenumberofoperations(Figure8[LEFT])
+anddecreasewiththenumberofmachines(Figure8[RIGHT]).PDRsoftenconductsortingoperationstoprioritizethe
+possibleschedulingactionsandthecomputationalcostofthisoperationincreasewiththesizeofJSSPinstance. It
+isalsonoteworthythatourimplementationoftheGNN-schedulerdoesnotemployanyparallelization. Weexpectto
+effectivelyreducethecomputationaltimebyutilizingparallelizationwhilecomputingnodeembeddings. Therefore,we
+canfurtherdecreasethecomputationaltimegapbetweenPDRsandGNNschedulerinpractice.
+8 Conclusion
+Inthispaper,weproposedawaytoconstructanefficientschedulerforjobshopschedulingproblems(JSSPs)witha
+GNN-RLframework. WeformulatedthesequentialschedulingprocessoftheJSSPasanMDP.Then,weproposeda
+graphrepresentationforJSSPs,whichservesasthestateoftheproposedMDP.WethenemployedaGNNtolearnnode
+embeddingsthatcapturethespatialstructureoftheJSSPspecifiedintheproposedgraph. Weproposedascheduling
+modulethatutilizesthenodeembeddingandrecommendstheoperationtobeprocessed. WeusedRLtotrainthe
+parameterswhileconsideringthetemporalpropertyoftheJSSP,i.e.,thecurrenttimestep’sdispatchingimpactsthe
+consequentdispatching. TheproposedGNNschedulerlearnsthegeneralpropertiesofJSSPsratherthantheproperties
+ofaspecificJSSPinstance. Therefore,theGNNschedulercanyieldhigh-qualityschedulingsolutionsforanyJSSP
+withoutadditionaltraining.
+TheproposedGNNscheduleroutperformedallPDRswhentestingonJSSPinstancesgeneratedbythedistribution
+usedforgeneratingtraininginstances. TheproposedGNNschedulershowedrobustperformancesonvarioussetsof
+benchmarkinstancesincontrasttoPDRs,whosesolutionqualitiesfluctuateddependingonthepropertiesofthegiven
+JSSP.Also,theproposedGNNschedulerachievedbetterschedulingthantheRL-basedschedulerswiththerestriction
+ontestinginstances. Overall,theresultsdemonstratethatourframeworkcanproduceageneralizableschedulingpolicy
+so that the GNN scheduler trained on only small JSSPs can generate high-quality schedules for large-sized JSSPs
+withoutadditionaltraining.
+16
+
+--- PAGE 17 ---
+LearningtoscheduleJob-shopproblemswithGNN-RL
+AlthoughtheproposedGNNschedulershowedreliableperformanceonourtestingsetandbenchmarkJSSPinstances,
+thecomputationaltimetocomputethenodeembeddingsrapidlyincreasesasthesizeofJSSPincreases. Becausethe
+totalnumberofedgesrequiredtorepresenttheJSSPstateisproportionalton2+nm,wherenandmarethenumbers
+ofjobsandmachines,respectively,thecomputationaltimetocomputethenodeembeddingsisalsoproportionalto
+n2+nm. Inthefuturestudy,todecreasethecomputationaltime,weplantointroducethenewnodetyperepresenting
+machinesinthegraphrepresentationfortheJSSPstate. Wecanthenconstructdisjunctiveedgesbetweenthemachine
+nodeandthejobnodesoftheJSSPgraph,whichcanreducethetotalnumberofedgesfrom
+(cid:0)n(cid:1)
+tomn. Thereduced
+2
+numberofedgespossiblyreducethetotaltrainingandcomputationaltime. Lastly,thecurrentformulationdoesnot
+considermorepracticalconstraintssuchasbatchprocessesandwaitingtimeregulationsandflexibleshopsetup. Such
+formulationscanbehandledbyexpandingMDPformulationsuchthatstatetransitionscomplywiththeadditional
+constraints. Furthermore,therewardfunctioncanbemodifiedtocopewithsuchextension. Forinstance,byadding
+theterminalrewardthataccountsforthemeantardinessorflowtimeontheproposedrewardsetting,theproposed
+RL-basedapproachcanoptimizetheschedulingpolicyofdifferentinterests. Inafuturestudy,wewillexpandourMDP
+formulationtoincorporatesuchcomplexconstraints.
+References
+[1] Googleortools.version7.3(2019). https://github.com/google/or-tools.
+[2] J.Adams,E.Balas,andD.Zawack. Theshiftingbottleneckprocedureforjobshopscheduling. Management
+science,34(3):391–401,1988.
+[3] D. Applegate and W. Cook. A computational study of the job-shop scheduling problem. ORSA Journal on
+computing,3(2):149–156,1991.
+[4] M.E.AydinandE.Öztemel. Dynamicjob-shopschedulingusingreinforcementlearningagents. Roboticsand
+AutonomousSystems,33(2-3):169–178,2000.
+[5] P. W. Battaglia, J. B. Hamrick, V. Bapst, A. Sanchez-Gonzalez, V. Zambaldi, M. Malinowski, A. Tacchetti,
+D.Raposo,A.Santoro,R.Faulkner,etal. Relationalinductivebiases,deeplearning,andgraphnetworks. arXiv
+preprintarXiv:1806.01261,2018.
+[6] A.Baykasog˘luandF.S.Karaslan. Solvingcomprehensivedynamicjobshopschedulingproblembyusinga
+grasp-basedapproach. InternationalJournalofProductionResearch,55(11):3308–3325,2017.
+[7] M.CasertaandS.Voß. Metaheuristics: intelligentproblemsolving. InMatheuristics,pages1–38.Springer,2009.
+[8] R.-M.ChenandY.-M.Huang. Competitiveneuralnetworktosolveschedulingproblems. Neurocomputing,37
+(1-4):177–196,2001.
+[9] H.Fisher. Probabilisticlearningcombinationsoflocaljob-shopschedulingrules. Industrialscheduling,pages
+225–251,1963.
+[10] T.GabelandM.Riedmiller. Adaptivereactivejob-shopschedulingwithreinforcementlearningagents. Interna-
+tionalJournalofInformationTechnologyandIntelligentComputing,24(4),2008.
+[11] T. Gabel and M. Riedmiller. Distributed policy search reinforcement learning for job-shop scheduling tasks.
+InternationalJournalofproductionresearch,50(1):41–61,2012.
+[12] M.R.Garey,D.S.Johnson,andR.Sethi. Thecomplexityofflowshopandjobshopscheduling. Mathematicsof
+operationsresearch,1(2):117–129,1976.
+[13] C.D.Geiger,K.G.Kempf,andR.Uzsoy. Atabusearchapproachtoschedulinganautomatedwetetchstation.
+JournalofManufacturingSystems,16(2):102–116,1997.
+[14] X.Glorot,A.Bordes,andY.Bengio. Deepsparserectifierneuralnetworks. InProceedingsofthefourteenth
+internationalconferenceonartificialintelligenceandstatistics,pages315–323,2011.
+[15] A. K. Gupta and A. I. Sivakumar. Job shop scheduling techniques in semiconductor manufacturing. The
+InternationalJournalofAdvancedManufacturingTechnology,27(11-12):1163–1169,2006.
+[16] A.Hill,A.Raffin,M.Ernestus,A.Gleave,A.Kanervisto,R.Traore,P.Dhariwal,C.Hesse,O.Klimov,A.Nichol,
+M.Plappert,A.Radford,J.Schulman,S.Sidor,andY.Wu. Stablebaselines. https://github.com/hill-a/
+stable-baselines,2018.
+[17] O.HolthausandC.Rajendran. Efficientdispatchingrulesforschedulinginajobshop. InternationalJournalof
+ProductionEconomics,48(1):87–105,1997.
+[18] Y.KaempferandL.Wolf. Learningthemultipletravelingsalesmenproblemwithpermutationinvariantpooling
+networks. arXivpreprintarXiv:1803.09621,2018.
+17
+
+--- PAGE 18 ---
+LearningtoscheduleJob-shopproblemswithGNN-RL
+[19] E.Khalil,H.Dai,Y.Zhang,B.Dilkina,andL.Song. Learningcombinatorialoptimizationalgorithmsovergraphs.
+InAdvancesinNeuralInformationProcessingSystems,pages6348–6358,2017.
+[20] D.P.KingmaandJ.Ba. Adam: Amethodforstochasticoptimization. arXivpreprintarXiv:1412.6980,2014.
+[21] W. Kool, H. van Hoof, and M. Welling. Attention, learn to solve routing problems! arXiv preprint
+arXiv:1803.08475,2018.
+[22] S.Lawrence. Resouceconstrainedprojectscheduling: Anexperimentalinvestigationofheuristicscheduling
+techniques(supplement). GraduateSchoolofIndustrialAdministration,Carnegie-MellonUniversity,1984.
+[23] Z.Li,Q.Chen,andV.Koltun. Combinatorialoptimizationwithgraphconvolutionalnetworksandguidedtree
+search. InAdvancesinNeuralInformationProcessingSystems,pages539–548,2018.
+[24] C.-C.Lin,D.-J.Deng,Y.-L.Chih,andH.-T.Chiu. Smartmanufacturingschedulingwithedgecomputingusing
+multi-classdeepqnetwork. IEEETransactionsonIndustrialInformatics,2019.
+[25] Z.Lomnicki. A“branch-and-bound”algorithmfortheexactsolutionofthethree-machineschedulingproblem.
+Journaloftheoperationalresearchsociety,16(1):89–100,1965.
+[26] A.S.Manne. Onthejob-shopschedulingproblem. OperationsResearch,8(2):219–223,1960.
+[27] A. Mittal, A. Dhawan, S. Medya, S. Ranu, and A. Singh. Learning heuristics over large graphs via deep
+reinforcementlearning. arXivpreprintarXiv:1903.03332,2019.
+[28] V.Mnih,K.Kavukcuoglu,D.Silver,A.Graves,I.Antonoglou,D.Wierstra,andM.Riedmiller. Playingatariwith
+deepreinforcementlearning. arXivpreprintarXiv:1312.5602,2013.
+[29] C.S.Ong. Hybridgeneticalgorithmwithmulti-parentsrecombinationforjobshopschedulingproblems/Ong
+ChungSin. PhDthesis,UniversityofMalaya,2013.
+[30] G.Ozturk,O.Bahadir,andA.Teymourifar. Extractingpriorityrulesfordynamicmulti-objectiveflexiblejobshop
+schedulingproblemsusinggeneexpressionprogramming. InternationalJournalofProductionResearch,57(10):
+3121–3137,2019.
+[31] S.S.PanwalkarandW.Iskander. Asurveyofschedulingrules. Operationsresearch,25(1):45–61,1977.
+[32] J.ParkandJ.Park. Physics-inducedgraphneuralnetwork:Anapplicationtowind-farmpowerestimation. Energy,
+187:115883,2019.
+[33] M.Pinedo. Scheduling: theory,algorithms,andsystemsmulti-coloring,2008.
+[34] M.Prates,P.H.Avelar,H.Lemos,L.C.Lamb,andM.Y.Vardi. Learningtosolvenp-completeproblems:Agraph
+neuralnetworkfordecisiontsp. InProceedingsoftheAAAIConferenceonArtificialIntelligence,volume33,
+pages4731–4738,2019.
+[35] B.RoyandB.Sussmann. Schedulingproblemswithdisjunctiveconstraints. Noteds,9,1964.
+[36] A.Sanchez-Gonzalez,N.Heess,J.T.Springenberg,J.Merel,M.Riedmiller,R.Hadsell,andP.Battaglia. Graph
+networksaslearnablephysicsenginesforinferenceandcontrol. arXivpreprintarXiv:1806.01242,2018.
+[37] J.Schulman,S.Levine,P.Abbeel,M.Jordan,andP.Moritz. Trustregionpolicyoptimization. InInternational
+conferenceonmachinelearning,pages1889–1897,2015.
+[38] J.Schulman,F.Wolski,P.Dhariwal,A.Radford,andO.Klimov. Proximalpolicyoptimizationalgorithms. arXiv
+preprintarXiv:1707.06347,2017.
+[39] S.SeoandY.Liu. Differentiablephysics-informedgraphnetworks. arXivpreprintarXiv:1902.02950,2019.
+[40] A.N.ShiraziandM.Sodhi. Manuscript–iv: Multi-objectivegeneticalgorithmforbackupstationinfault-tolerant
+flowlinedesign. ANovelGeneticAlgorithmanditsApplicationtoOptimizeManufacturingSchedules,page109,
+2016.
+[41] R.H.Storer,S.D.Wu,andR.Vaccari. Newsearchspacesforsequencingproblemswithapplicationtojobshop
+scheduling. Managementscience,38(10):1495–1509,1992.
+[42] R.S.SuttonandA.G.Barto. Reinforcementlearning: Anintroduction. MITpress,2018.
+[43] R.S.Sutton,D.Precup,andS.Singh. Betweenmdpsandsemi-mdps: Aframeworkfortemporalabstractionin
+reinforcementlearning. Artificialintelligence,112(1-2):181–211,1999.
+[44] E.Taillard. Benchmarksforbasicschedulingproblems. europeanjournalofoperationalresearch,64(2):278–285,
+1993.
+[45] J.C.TayandN.B.Ho. Designingdispatchingrulestominimizetotaltardiness. InEvolutionaryScheduling,
+pages101–124.Springer,2007.
+18
+
+--- PAGE 19 ---
+LearningtoscheduleJob-shopproblemswithGNN-RL
+[46] J.C.TayandN.B.Ho. Evolvingdispatchingrulesusinggeneticprogrammingforsolvingmulti-objectiveflexible
+job-shopproblems. Computers&IndustrialEngineering,54(3):453–473,2008.
+[47] J.J.vanHoorn. Thecurrentstateofboundsonbenchmarkinstancesofthejob-shopschedulingproblem. Journal
+ofScheduling,21(1):127–128,2018.
+[48] T.Wang,R.Liao,J.Ba,andS.Fidler. Nervenet: Learningstructuredpolicywithgraphneuralnetworks. 2018.
+[49] G.R.Weckman,C.V.Ganduri,andD.A.Koonce. Aneuralnetworkjob-shopscheduler. JournalofIntelligent
+Manufacturing,19(2):191–201,2008.
+[50] T.WillemsandL.Brandts. Implementingheuristicsasanoptimizationcriterioninneuralnetworksforjob-shop
+scheduling. JournalofIntelligentManufacturing,6(6):377–387,1995.
+[51] Z.XinyiandL.Chen. Capsulegraphneuralnetwork. 2018.
+[52] K. Xu, W. Hu, J. Leskovec, and S. Jegelka. How powerful are graph neural networks? arXiv preprint
+arXiv:1810.00826,2018.
+[53] T.Yamada. Studiesonmetaheuristicsforjobshopandflowshopschedulingproblems. 2003.
+[54] T.YamadaandR.Nakano. Ageneticalgorithmapplicabletolarge-scalejob-shopproblems. InPPSN,volume2,
+pages281–290,1992.
+[55] Z.Yang,J.Zhao,B.Dhingra,K.He,W.W.Cohen,R.Salakhutdinov,andY.LeCun. Glomo: Unsupervisedly
+learnedrelationalgraphsastransferablerepresentations. arXivpreprintarXiv:1806.05662,2018.
+[56] S.J.YimandD.Y.Lee. Schedulingclustertoolsinwaferfabricationusingcandidatelistandsimulatedannealing.
+JournalofIntelligentManufacturing,10(6):531–540,1999.
+19
+
+--- PAGE 20 ---
+LearningtoscheduleJob-shopproblemswithGNN-RL
+A GeneratingdistributionsofbenchmarkJSSPinstances
+We summarize the generating procedure of each benchmark JSSP instance. To our best knowledge, The original
+manuscriptswhichproposedFT,LA,andSWVinstancesarenotaccessible.
+A.1 ORBinstances
+The ORB instances are proposed by [3]. The ORB instances are all size of 10×10. The authors collected five
+10×10instancesfromthedifferentinstances;MT10,ABZ5,ABZ6,LA19,LA20,andgeneratedfivetheiroriginal
+instancesnamedORB1,ORB2,ORB3,ORB4,andOR5. TheyrenamedtheteninstancesasORBs[29]. Thegeneration
+procedure of the originally proposed five instances ORB1-5 is not specified precisely. The authors describe the
+generationprocedureasfollows:
+theproblemsORB1throughORB5weregeneratedinBonnin1986: theprescribedprocessingorders
+foreachproblemweregeneratedbyguests(withthechallengetomaketheproblems"difficult"and
+foreachproblem,wegeneratedtwosetsofprocessingtimesatrandomandretainedthatsetwhich
+gaveaproblemhavingthegreatestgapbetweentheoptimalvalueandastandardlowerbound).
+A.2 ABZinstances
+TheABZ5-9instancesarefirstlyproposedfrom[2].Forallinstances,thejobshavetobeprocessedonallmachines.The
+machinesequenceofeachjobisrandomlygeneratedfromauniformdistribution. Theprocessingtimesofoperationsin
+ABZ5arerandomlydrawnfromtheintegeruniformdistributionontheinterval[50,100]. i.e.,theprocessingtimesof
+ABZ5∼U[50,100]. TheprocessingtimesofABZ6,AB7,AB8andAB9followsU[25,100],U[11,40],U[11,40]and
+U[11,40],respectively.
+A.3 YNinstances
+TheYN1-4instancesarefirstlyproposedfrom[54]. TheYN1-4instancesareallsizeof20×20. Theydonotspecify
+thegenerationschemeofmachinesequencesofjobs. TheprocessingtimesofYN1-4weresampledfromU[10,50].
+A.4 TAinstances
+The TA01-80 instances are firstly proposed from [44]. The number of machines m and jobs n were drawn from
+U[15,20]andU[15,100],respectively. TheprocessingtimesweredrawnfromU[1,99]. Themachineorderswere
+generatedbythefollowingsequence:
+1. Theoperationsareassignedtothemachineswithoutperturbation. i.e.,thefirstmachineprocessesthefirst
+operation.
+2. Fromthefirstoperation, swaptheassignedmachinewiththe operation thatisrandomlychosenfromthe
+succeedingoperations. Repeatthisprocedureuntilthelastoperation.
+20

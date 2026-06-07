@@ -1,0 +1,650 @@
+
+--- PAGE 1 ---
+A Reinforcement Learning Environment For Job-Shop Scheduling
+PierreTassel,1 MartinGebser,1 2 KonstantinSchekotihin1
+1DepartmentofArtificialIntelligenceandCybersecurity
+UniversityofKlagenfurt,Klagenfurt,Austria
+2InstituteofSoftwareTechnology
+GrazUniversityofTechnology,Graz,Austria
+pierre.tassel@aau.at,martin.gebser@aau.at,konstantin.schekotihin@aau.at
+Abstract
+Schedulingisafundamentaltaskoccurringinvariousauto-
+matedsystemsapplications,e.g.,optimalschedulesforma-
+chinesonajobshopallowforareductionofproductioncosts
+andwaste.Nevertheless,findingsuchschedulesisoftenin-
+tractableandcannotbeachievedbyCombinatorialOptimiza-
+Figure1:Examplesolutionforasmallinstancecomposedof
+tionProblem(COP)methodswithinagiventimelimit.Re-
+threejobsandthreemachines.Eachmachineseeseachjob
+cent advances of Deep Reinforcement Learning (DRL) in
+once,andthetimespentoneachoperationvariesfromone
+learningcomplexbehaviorenablenewCOPapplicationpos-
+sibilities.ThispaperpresentsanefficientDRLenvironment jobtoanother.
+forJob-ShopScheduling–animportantprobleminthefield.
+Furthermore,wedesignameaningfulandcompactstaterep-
+resentationaswellasanovel,simpledenserewardfunction,
+closelyrelatedtothesparsemake-spanminimizationcriteria representsasolutionforasmallinstancecomposedofthree
+used by COP methods. We demonstrate that our approach jobsandthreemachines.
+significantlyoutperformsexistingDRLmethodsonclassic TheapplicationofReinforcementLearning(RL)toJSS
+benchmarkinstances,comingclosetostate-of-the-artCOP provides several advantages. First, it is more flexible than
+approaches.
+traditional priority dispatching rule heuristics, whose per-
+formance can vary significantly from instance to instance.
+Introduction In addition, the development of such heuristics is quite te-
+dioussinceitrequiresalotofspecializedknowledgeabouta
+DeepReinforcementLearning(DRL)hasgainedanincreas- schedulinginstancetobeeffective.UnlikeclassicCOPmeth-
+ing interest in the AI community, thanks to many recent ods,suchaslinearprogramming(LP)orconstraintprogram-
+successeslikeAtari(Mnihetal.2013),AlphaGo(Silveretal. ming(CP),RLenvironmentscanmodelstochasticdecisions,
+2018), or AlphaStar (Vinyals et al. 2019). Most of the ap- e.g.,randomfactoryoutage,non-deterministicjobre-entry,
+proachesinthisfieldfocusonwell-establishedbenchmarks randomprocessingtime,etc.,whichsimulatetheconditions
+fromtheOpenAIgymlibraryorvideogames(Atari,Starcraft, facedbyrealschedulingsystems.Second,incontrasttotradi-
+Dota,etc.).Giventhesesuccessfulapplications,researchers tionalschedulingmethodsthatfocusonthegivensetofjobs
+soonrecognizedthepotentialbenefitsofDRLinpracticaldo- only,RLprovidesapossibilitytoincrementallyschedulethe
+mains,suchasCombinatorialOptimizationProblems(COPs) incomingjobsastheyappearinthequeuebyconsideringthe
+(Bengio,Lodi,andProuvost2021). impactofascheduleforknownjobsonthenewones.Finally,
+In this paper, we present a DRL-based approach to Job- themostpromisingpossibilityofferedbyRListheconcept
+Shop Scheduling (JSS), an important problem that was oflifelonglearning(ChenandLiu2018),whereanagentwill
+among the first COPs ever studied (J.F. Muth 1966). Its notonlylearntooptimizeonespecificJSSinstancebutreuse
+application domains are wide, from the ordering of com- whatithaslearnedfrompreviousinstances.Thisproperty
+putationtaskstotheschedulingofmanufacturingsystems. isessentialforindustrialproblemswhereinstancesusually
+Initsclassicvariant,eachinstanceofJSScomprisestwosets sharealotofsimilarities.
+ofconstantsrepresentingjobsJ andmachinesM.Eachjob
+Inthispaperwemakethefollowingcontributions:
+J ∈J mustgothrougheachmachineinMinaspecificor-
+i
+derdenotedasO →···→O ,whereeachelementO • WeproposetomodelJSSasasingle-agentRLproblem,
+i1 ini ij
+(1≤j ≤n )iscalledanoperationofJ withaprocessing wheretheagentisadispatcherthatneedstochoosewhich
+i i
+timep ∈N.Thebinaryrelation→iscalledtheprecedence job to work on at each step. In particular, we use the
+ij
+constraint.Thereisatotalof|J|×|M|operationstoperform, actor-criticProximalPolicyOptimization(PPO)algorithm
+andtheirexecutionsarenon-preemptive.Also,nomachine (Schulman et al. 2017) to learn a policy, i.e., a function
+canperformmorethanoneoperationsimultaneously.Fig.1 thatmapsastatetoanactionprobabilitydistribution,and
+1202
+rpA
+8
+]GL.sc[
+1v06730.4012:viXra
+
+--- PAGE 2 ---
+approximate the state-value function, i.e., the excepted and plugging it into a Stochastic Gradient Ascent (SGA)
+cumulativerewardgivenastate. algorithm.Thegradientestimatorisoftheform:
+• Wedesignanenvironmentwithameaningfulandcompact (cid:34) T (cid:35)
+staterepresentation,aswellasanovelandsimpledense ∇
+θ
+J(π
+θ
+)= E (cid:88) ∇
+θ
+logπ
+θ
+(a
+t
+|s
+t
+)Aπθ(s
+t
+,a
+t
+)
+rewardfunction,closelyrelatedtothesparsemake-span τ∼πθ
+t=0
+minimizationobjectiveofCOPmethods.
+• ExperimentsoninstancesthatarehardforCOPmethods
+whereπ
+θ
+isastochasticpolicy,andAπθ isanestimatorof
+theadvantagefunctionattime-stept.VanillaPolicy-Gradient
+undertimeconstraintsindicatethattheapplicationofRL
+algorithm REINFORCE (Williams 1992) uses a complete
+algorithmsinourenvironmentresultsinsolutionscloseto
+roll-outasanunbiasedestimator,butthisestimatorsuffers
+thoseofthebestschedulingtechniquesonthemarketand
+fromhighvariance.Actor-Criticmethodsovercomethisby
+farbetterthanresultsreportedintheRLliteraturebefore.
+traininganeuralnetworktoestimatethestate-valueofthe
+nthstateinthefuture.Itavoidsdoingroll-outandtradesoff
+Background
+varianceforbias(Mnihetal.2016).
+Inthissection,weprovidesomemathematicalbackground AfundamentalpropertyofPolicy-Gradientalgorithmsis
+for Markov Decision Processes (MDPs) and RL, give de- that update steps computed at any specific policy π only
+θ
+tailsofthePPOalgorithm,anddiscussotherRLscheduling guaranteepredictivenessinaneighborhoodaroundθ.Vanilla
+approachesfoundintheliterature. Actor-Criticmethodstendtosufferfrom“policy-crash”(i.e.,
+aperformancecollapse)ifthestepsizeisinadequate.Policy-
+Markov Decision Processes MDPs are discrete-time Gradient algorithms keep policy updates close in the pa-
+stochastic control processes used to model decision mak- rameterspace.Butevenseeminglysmalldifferencesinthe
+ing.Inthisprocess,theoutcomeispartlyrandomunderthe parameterspacecanhaveasubstantialimpactanddeteriorate
+control of a decision-maker. Formally, an MDP is defined thepolicyperformance(Schulmanetal.2015;OpenAI2017).
+asa4-tupleM = (S,A,P ,R )whereS isasetofstates PPOtriestotakethebiggestpossibleimprovementstepwith-
+a a
+(statespace),Aisasetofactions(actionspace),P (s,s(cid:48)) outsteppingsofarthatweaccidentallycauseperformance
+a
+theprobabilitytogofromstatestos(cid:48)bytakingactiona(in collapse. It does so by taking multiple steps of SGA on a
+ourcasetheenvironmentisdeterministic,sotheprobability clippedobjectivefunction.HerethelossfunctionLisgiven
+issetto1)andR (s,s(cid:48))therewardwegetaftertransitioning by:
+a
+fromstatestos(cid:48). (cid:18) (cid:19)
+π (a|s)
+L=min θ Aπθk(s,a), g((cid:15),Aπθk(s,a))
+π (a|s)
+ReinforcementLearning ThegoalofanRLtrainingalgo- θk
+(cid:26)
+rithmistolearnapolicyπthatmapseachstatetoanaction (1+(cid:15))A A≥0
+g((cid:15),A)=
+withtheintenttomaximizetheexpectedcumulativereward. (1−(cid:15))A A<0
+Givenapolicyπ,wecancomputethevalueVπofthispolicy
+inwhichθandθ aretheparametersofthenewandtheold
+forastates as: k
+0 policy,respectively,and(cid:15)a(small)hyper-parameterwhich
+(cid:34) (cid:88) +∞ (cid:35) roughlysayshowfarawaythenewpolicyisallowedtogo
+Vπ(s 0 )=Eπ γtR(s t ,a t ) fromtheoldone.
+t=0
+withEπ theexpectationoverthedistributionoftheadmissi- RelatedWork
+bletrajectories(s 0 ,a 0 ,r 0 ,s 1 ,a 1 ,r 1 ,...)obtainedbysam- Recently, DRL has gained attraction as an end-to-end ap-
+plingtheactionsfromthepolicyπandγ,thediscount-rate,a proachtosolveCOPs.FromtheTravelingSalesmanProblem
+hyper-parameterthatcontrolshowfartheagentlooksintothe over Graph Optimization to the Satisfiability problem, the
+future.Apolicyisoptimalifnootherpolicyyieldsahigher numberofDRLapplicationsisincreasingsharply.However,
+returnvalue. applicationsofDRLtoschedulingproblemsaremorerecent
+A value-based algorithm tries to approximate the state- andlimited.
+valuefunction.Whenonehaslearnedthisfunction,thepolicy Oneclassicapproachtomodelschedulingproblemsisto
+canbedefinedasselectingtheactionleadingtothestatewith considereachmachineasanagent.Waschnecketal.(2018)
+themaximumvalue(Mnihetal.2013).Incontrast,apolicy- modelJSSbyamulti-agentsystem,whereagentsstanding
+basedalgorithmtriestodirectlylearnthepolicymaximizing formachinesaretrainedoneaftertheotherusingDeepQ-
+thecumulativerewardbyincreasingtheprobabilityofactions Network(DQN)learning.Anevaluationoftheirapproachon
+thatyieldagoodreturn(SuttonandBarto2018).State-of-the- anon-publicinstancesetforasemiconductorfactoryshows
+artpolicy-basedalgorithmscombinethesetwoapproaches thatitisresilienttodisruptions.Itcannotbeatheuristicsbut
+by learning the policy and the state-value function. These reachesexpert-levelperformanceaftertwodaysoftraining.
+algorithmsarecalledactor-criticmethods(Mnihetal.2016). Anothermulti-agentapproachwassuggestedin(Liu,Chang,
+andTseng2020),wheretheauthorsappliedDeepDetermin-
+ProximalPolicyOptimization
+istic Policy Gradient to train the agents. On small to mid-
+Policy-gradientalgorithmslearnthepolicybycomputingan sizeinstances—maximumof20jobsand15machineswith
+estimatorofthepolicygradientthroughexperiencesampling known optimal solutions—their approach performs better
+
+--- PAGE 3 ---
+thandispatchingrules,eventhoughFirst-In-First-Out(FIFO) theorderedstackofthenexttime-stepwewillvisit.When
+comesveryclose.SimilartoWaschnecketal.(2018),Liu, wecannotallocateanyfurtherjobordecideforNo-Opata
+Chang,andTseng(2020)focusonflexibilityandproposea certaintime-step,weiterativelygotothenexttime-stepin
+scenariowithrandommachinebreakdowns. ordertoallocatejobsagain(i.e.,amachinebecomesfree).
+Whilethemulti-agentapproachseemsappealing,itcanbe InFig.2,weillustratetheinternalstatusoftheenviron-
+hardtolearnapolicywhereagentscollaborateandsharea ment.Theverticalredlinerepresentsthecurrenttime-step.
+globalvisiononthescheduletofindgoodsolutions.Thedis- WecanallocatejobJ (inyellow)tomachineM (thema-
+2 0
+junctivegraphrepresentationofJSSisamodelingapproach chinewewillallocatethejobtoisnotgivenexplicitlybythe
+allowingforsuchaglobalvision.Zhangetal.(2020)model environment).Or,aswehaveonlyonelegalaction,wecan
+the problem by a single agent and exploit the disjunctive gotothenexttime-stepT formachineM tobecomefree
+8 1
+graph of a JSS instance to design an embedding of states andallocatejobJ toit.
+0
+usingaGraphNeuralNetwork.Moreover,theauthorsusea
+Multi-LayerPerceptron(MLP)tocomputeascalarscorefor
+eachactionbasedonthegraphembeddingandapplyasoft-
+maxfunctiontooutputanactionprobabilitydistribution.The
+advantageofthisapproachisthatthepolicynetworkisinde-
+pendentofthesizeofaninstance.Itcanbetrainedonsmall
+instancesandthengeneralizetobiggerones.Similarly,Han
+andYang(2020)usethedisjunctivegraphtoencodestatesas
+animageofsize|J|×|M|representingthetotalnumberof Figure2:Representationoftheenvironment’sinternalstate
+operationsintheinstance.Channelsoftheimagerepresent comprisingtheinformationaboutthecurrenttime-step,the
+threefeatures:processingtime,thescheduleatthecurrent allocationofjobstomachines,thejobsthatcanbeallocated
+time-step,andmachineutilization.Suchanimageispassed nowandthefuturetime-steps.
+toaconvolutionalneuralnetworkthatactsasastate-action
+valuefunctionapproximator.Theactionspaceisdefinedasa
+setof18differentdispatchingrulesthattheagentcanselect.
+Search-spaceReduction
+Therewardfunction,likeours,reflectstheimpactofthejob
+allocationonmachineutilization.However,thedisjunctive To achieve good performance in a short time, we need to
+graphformulationmakescomputingarewardfunction,for guideouragenttoavoidexploringsub-optimalsolutions.
+whichHanandYang(2020)comparetheaveragemachine Consideringtwojobs,J andJ ,toallocatetothesame
+1 2
+utilizationbeforeandaftertakingaction,harderthanourrep- machine,ifJ isatitsfinaloperation(i.e.,thejobhasalready
+1
+resentation.Finally,Linetal.(2019)useamulti-classDQN completed |M| − 1 operations and needs only one more
+methodtosolveJSSinstances.Theiragentlearnstoassign operationtobefinished)andJ isnot,itisalwaysbetterto
+2
+oneof7dispatchingrulesforeachmachine.Theirevaluation allocateJ ,asitwillstillneedanothermachineafterwards.
+2
+resultsonsmalltomid-sizeinstances—maximumof20jobs Werefertothisoptimizationasnon-finalprioritization.
+and20machineswithknownoptimalsolutions—showthat, Compared to other actions, the No-Op action deserves
+althoughthesuggestedapproachfoundbettersolutionsthan particular attention. This action is complex to learn, as it
+theindividualdispatchingrules,theyarestillfarfrombeing oftenleadstoworseresultsthangreedypolicies(disregarding
+optimal. No-Opandallocatingjobstomachineswheneverpossible)if
+notusedwithcare.Ifwedonotguidetheagenttolearnhow
+Job-ShopSchedulingEnvironment touseNo-Op,itwillstopusingitandbecomeagreedyagent
+becausetheweightoftheNo-Op’slogitwilltendto0.
+Inthissection,wefirstintroducethebasicsofourJSSen-
+Thefirstruleweapplymarksjobsthatcouldbeallocated
+vironmentandexplainitsinternalworking.Thenwedetail
+toamachineasillegalwhenNo-Opisusedinstead,aslong
+ourrewardfunctionanddefinethestatespace.Finally,we
+aswedonotallocateanewjobtothemachine(i.e.,ajob
+presentsomeimplementationdetailsofourenvironment.
+thatwasnotlegalbeforetheNo-Op).Wedothisbecauseit
+isalwaysbetter(orequivalent)toallocateajobJ directly
+BasicEnvironment
+attime-stepT ratherthanwaitingforX >0time-unitsand
+We consider JSS as a single-agent problem, where a dis- thenallocatingJ attime-stepT +X.Thisrestrictstheuse
+patcherchoosesajobtoworkonateachtime-step.Wedefine oftheNo-Opaction,asweinsistontheavailabilityofsome
+theactionspaceasthediscretesetofjobsplusanextraaction, newjobtoallocateinthefuture,ortheconsideredmachine
+calledNo-Op,togotothenexttime-stepwithoutscheduling willbeblockedindefinitelyotherwise.
+anyoperation:A={J ,...,J ,No-Op}. TorestrictNo-Opfurther,foreachmachine,wecompute
+0 |J|−1
+Insomecases,wecannotallocateajobateachstepsince theminimumdurationDofeachlegaljobwecanschedule.
+somejobsmayalreadybeallocatedtoamachine,themachine Next,wecheckwhetherwewillhaveanewjobtoallocate
+canbeinuse,orwehavecompletedallthejob’soperations. tothemachineinlessthanDtime-units.Thisruleisbased
+Tocomplywiththeseconstraints,ourenvironmentalsouses ontheobservationthat,ifwemakeapauselongerthanD,it
+a Boolean vector indicating which actions are legal. Each wouldhavebeenbettertoallocateajobofdurationDbefore.
+time the agent allocates a job, it adds the assigned job to Additionally,thenewjobweneedtoallocatenextshouldnot
+
+--- PAGE 4 ---
+100
+80
+60
+40
+20
+0
+0 5000 10000 15000 20000 25000
+Episode
+detceles
+snoitca
+pO-oN
+illegalwhenNo-Opisused,whichforceseitherimmediate
+jobexecutionorfutureallocationofsomenewjobinstead.
+Inaddition,theremaybeintra-machinesymmetries,when
+the execution of two non-final operations of different jobs
+canbeswappedduetowaitingtimesbeforeallocatingtheir
+respectivesuccessoroperations.Suchdynamicsymmetries
+cannot easily be broken at the time-step of job allocation.
+Non-finalprioritization(seeSection)breaksthesesymme-
+tries partially, whenever it is equivalent to allocate a final
+operationfirstandanon-finaljobafterwards.
+RewardFunction
+Thetraditionalmetrictoevaluateasolutionisthemaximum
+make-spanacrossallthejobs,i.e.,thetimeneededtohave
+finishedeveryjob.However,thismetricmightleadtoasparse
+rewardfunction,whichprovidesfeedbackonlyattheendof
+Figure3:TheagentlearnstousetheNo-Opactionsparingly theepisode.Asaresult,theagentmightstruggletodetermine
+withoutavoidingitcompletely.ThenumberofNo-Opactions theimpactofeachactionithastakenontheglobaloutcome.
+selected was measured using a running average over the To improve learning, we have designed a dense reward
+last2000episodesforeachofTaillard’sinstances.Thisplot functionbasedonthescheduledarea.Aftereachaction,we
+representsthemeanand95%confidenceinterval. computethedifferencebetweenthedurationoftheallocated
+operationsandtheintroducedholes—theidletimeofama-
+chine:
+beatitsfinaloperationbecausewaitingforajobrejectedby
+(cid:88)
+non-finalprioritization(seeabove)ispointless. R(s,a)=p − empty (s,s(cid:48))
+aj m
+TopreventalmostcertainlybadusesofNo-Opandavoid
+m∈M
+time-consumingNo-Opchecks,wedisallowtheNo-Opac-
+wheresands(cid:48)thecurrentandnextstaterespectively;athe
+tionifthereare(1)fourormoremachineswithsomeallocat-
+jthoperationofJ withaprocessingtimep scheduled(i.e.,
+ablejob,or(2)fiveormoreallocatablejobs(morethan15% a aj
+theaction);s(cid:48) thenextstateresultingfromapplyingaction
+ofthejobs/machinesavailableintotal).Iftheagentstilltakes
+atostates;empty (s,s(cid:48))afunctionreturningtheamount
+theNo-Opaction,weiterateoverthenexttime-stepsuntil m
+oftimeamachinemisIDLEwhiletransitioningfromstate
+somenewjobbecomesallocatable.InFig.3,weseethatthe
+s to s(cid:48). Note, a re-scaled reward—R(s,a) divided by the
+agentlearnsthepotentiallydeleteriouseffectoftheNo-Op
+maximumoperationlength,turnedouttobemoresuitable
+actiononthesolutionqualityquicklyandusesitsparingly
+fortrainingofneuralnetworksinourexperiments.
+towardstheendofthetrainingepisodes.
+For example, in Fig. 2, suppose we allocate job J on
+2
+machineM .Inthatcase,wegetasapositivereward—the
+ProblemSymmetries 0
+lengthoftheoperationwehavescheduled.Sincethereisno
+JSScomprisesalotofsymmetriesthatcanincreasethesearch more available action, the environment will automatically
+spaceunnecessarily.Ourenvironmentconsiderstwoofthem: jumptothenexttime-step.Nevertheless,thisactioncreates
+(1)interchangeabilityofallocationsatatime-step,and(2)the aholeonmachineM .Aswecurrentlyareattime-stepT ,
+2 7
+executionofjobsandtheNo-Opactiononamachine.Inthe and we jump to time-step T , the negative reward will be
+8
+firstcase,e.g.,anagentmightallocateajobJ tomachine 1.Wethensumthepositiveandnegativerewardsuptoget
+1
+M ,andthenjobJ tomachineM atthesametime-step. the total reward. Therefore, the reward function results in
+1 2 2
+ThisallocationorderissymmetrictoallocatingJ toM first theminimizationofthescheduleareaonaGanttchart,i.e.,
+2 2
+andthenJ toM .Suchsymmetryislesspronouncedinour minimizetheholesforeachmachineandmaximizemachine
+1 1
+environmentbecausetheapplicabilityoftheNo-Opaction usage.Thisisdifferentfromminimizingthemake-span,but
+dependsonthenumberofjobsandmachinesavailable,sothat bothcriteriaarecloselyrelated—agoodsolutionhasasfew
+theorderofallocationcanmatter.Notethatwecannotbreak holes as possible. This relation can be observed in Fig. 4
+this symmetry by ordering the machines and first allocate wherewecomparetheevolutionduringthetrainingofthe
+somejobtothemachinewiththesmallestidentifier.Sucha meanmake-spanofasolutionfoundanditscumulativere-
+modelleadstoamulti-agentsystemwithpolicysharing,thus ward.Thefigurerepresentsaninversevariationrelationship:
+losingtheglobalviewandspecializingtheNo-Opactionto themake-spandecreaseswhenevertherewardincreases.This
+eachindividualmachine. experimentprovidessufficientevidencefortherelationof
+TheNo-Opactionitselfintroducessomesymmetry.Ifa thesetwocriteria.
+jobisallocatedtoamachinethatneedstowaitafterwards, Nevertheless,thisrewardfunctionisnotperfectbecause
+we can either complete the job and wait, or first wait and thereisstilladelaybetweenanactionanditsimpact.Forex-
+then allocate the job. As explained in Section , we break ample,ifwecanallocatemultiplejobsatacertaintime-step,
+suchsymmetrybymarkingallocatablejobsas(temporarily) thenonlythelastactionofthistime-stepwillcreateholes.
+
+--- PAGE 5 ---
+3000
+2800
+2600
+2400
+2200
+0 5000 10000 15000 20000 25000
+Episode
+napS­ekaM
+160
+140
+120
+100
+80
+60
+40
+20
+0
+draweR
+experimentation,wehaveselectthesesevenattributesoutof
+Make­Span Reward otherpossibleattributes.
+One attractive property of this representation is how it
+easily allows constructing dispatching rules. For example,
+theMostWorkRemaining(MWKR)isequivalenttotakethe
+jobwiththelargestvalueofthea attribute,i.e.,thejobthat
+4
+hasthemostleft-overtimeuntilcompletion.Similarly,the
+FirstInFirstOut(FIFO)amountstotakethebiggestvalue
+ofthea attribute,i.e.,thejobwhichwasidleforthemost
+6
+timesinceitslastoperation.
+ProblemSpecification
+Anepisodeiscomposedofalotofsteps,i.e.,O(|J|×|M|)
+andbecauseoftheNo-Opoperation,thisisalowerbound.
+Asthechoiceatthefirststepscansignificantlyimpactthe
+Figure4:Thereisaclearcorrelationbetweenthereal,sparse
+solution’soutlook,theagentneedstousetheexperienceit
+objectivefunction(make-span)andourdenserewardfunc-
+haslearnedduringpreviousiterationstoimprovethenextone.
+tion.BothmetricswerecollectedonTaillard’sinstancesusing
+Moreformally,thecurrentstatecontainsalotofinformation
+arunningaverageoverthelast2000episodes.Thelinesrep-
+fromthepreviousstep,andonecannotrecoverfromabad
+resentthemeansoverallinstances,andsurroundingsgive
+state.
+the95%confidenceinterval.
+Wehaveappliedsomeoptimizationstomaketheenviron-
+ment fast enough. On one hand, we tried to keep the state
+representationassmallaspossible.Ontheother,variouscode
+Asaresult,onlythisactionwillgetnegativefeedback.We improvementsweremadetospeedupthestepcomputation.
+mitigatethisissuebyusingthealgorithmthatdoesmultiples Thus,wekeepthestaterepresentationinmemoryandupdate
+stepstocomputeeachaction’sreturn.Hence,smalldelaysin onlytheattributesthatneedtobeupdatedateachsteprather
+therewardwillnotaffectitmuchasthenumberofactionsat thanrecomputingthem.
+atime-stepisrelativelysmall.Anotherproblemisthatsome
+choicesdoneinthepastcanhaveahugeimpactonthefuture Method
+outlook,e.g.,forceustocreatealotofholes.Unfortunately,
+In this section we provide details of our approach and de-
+thisissueisinherenttothecomplexityofthisproblem.
+scribeitsimplementation.
+StateRepresentation
+ActionSelection
+Ourstaterepresentationisa(J ×7)matrix,containing,for
+every row (i.e. every job) 7 attributes: (a ) A Boolean to Our environment gives us a tabular state represented by a
+1
+representifthejobcanbeallocated.(a )Theleft-overtime matrix.Tocomputetheactiondistributionandthestate-value
+2
+forthecurrentlyperformedoperationonthejob.Thisvalue estimation,weflattenthismatrixintoavectorandpassitto
+is scaled by the longest operation in the schedule to be in theagentMLPs.
+therange[0,1].(a )Thepercentageofoperationsfinished Asexplainedpreviously,ourenvironmenthasanadditional
+3
+for a job. (a ) The left-overtime until total completion of specificitycomparedtoapureMDPmodelbecausewealso
+4
+thejob,scaledbythelongestjobtotalcompletiontimetobe getamaskoflegalactionsouragentcanperform.Different
+intherange[0,1].(a )Therequiredtimeuntilthemachine techniquescanbeappliedtoovercomethis.Oneistogive
+5
+needed to perform the next job’s operation is free, scaled a negative reward if the agent takes one illegal action and
+by the longest duration of an operation to be in the range hopesitwilllearntorecognizethem.Thisapproachyields
+[0,1].(a )TheIDLEtimesincelastjob’sperformedoper- poorperformancebecauseitmakestheproblemevenharder,
+6
+ation, scaled by the sum of durations of all operations to as the agent has to learn at the same time to differentiate
+beintherange[0,1).(a )Thecumulativejob’sIDLEtime betweenalegal/illegalactionandagood/badaction.
+7
+intheschedule,scaledasa tobeintherange[0,1).This Ourapproachistoapplyamaskontheoutputofaneural
+6
+information is sufficient to reconstruct the current state of network to transform values of illegal action into a small
+theschedule,andso,itrespectstheMarkovcondition.How- negativenumber,i.e.,thesmallestrepresentablenumber.It
+ever,thereconstructedsolutionmaynotbeuniquebutwill makestheillegalactionprobabilityverycloseto0whenwe
+beequivalent,i.e.,leadstothesamesolution.Wehavecon- applythesoftmaxfunction.Thistechniquehasalreadybeen
+sideredotherattributes,suchasthenumberofotherjobsthat studiedinpreviousworkandseemstoyieldthebestresults
+need the same next machine and more global information (HuangandOntan˜o´n2020).
+abouttheprocesslikethenumberofnexttime-steps,thenum-
+TrainingProcess
+beroflegalactions,etc.However,thenumberofattributes
+needstostayshorttoavoidtoomuchstatecomputationtime, Usually, the goal of reinforcement learning is to train an
+i.e.,theenvironmentbecameslow,andavoidtoomuchneu- agent that can perform a specific task. For our setting, the
+ralnetworkcomputations,i.e.,theagentbecameslow.After problemisdifferent,westillwanttolearntoschedulethe
+
+--- PAGE 6 ---
+production, but we are more interested in the agent’s best machineswherethegoalisalsotominimizethemake-span.
+solution. To comply with this goal, we keep track of each Ourapproachisnotconstraintbythesizeoftheproblemand
+solution’s make-span found by the agent at the end of the canbeappliedtosmallerorbiggerinstances.
+episode.Ofteninreinforcementlearning,wetrainforafixed
+numberofstepsorepisodes,but,inourcase,wehaveatime BaselineSelection
+constraint.Wehavelimitedthetrainingtimeto10minutes
+Toensureouragentislearningcomplexdispatchingstrategy,
+tohavearealisticapproachclosetoindustrialconstraints.
+wecompareitagainsttwowell-knowndispatchingrulesfrom
+theliterature.FIFOselectsthejobthathaswaitedthemost,
+Implementation
+andMWKRthejobwiththemostleft-overprocessingtime
+WehaveimplementedourapproachusingRLLib(Liangetal. untilcompleteness.Thesedispatchingrulesusuallyperform
+2018)andTensorflow(Abadietal.2015).Theenvironment quitewellastheyactgreedy(i.e.,donotintentionallycreate
+isimplementedwithOpenAIGymtoolkit.1
+holes)andtendtobalancejoballocation.Dispatchingrules
+WehaveusedWandB(Biewald2020)Bayesianoptimiza- aredeterministicandrunonlyonce.Therefore,theygivea
+tiontoperformthehyper-parametersearchandlogallresults solutioninlessthanasecond.
+providedinthispaper.2Unfortunately,duetocomputingre-
+Wehaveselectedthetwopapersfromtheliteraturethat
+sourcesrestriction,wehaveusedonlyoneinstance(ta41)to evaluate their approaches on the same instances as us. In
+performourhyper-parametersearchandusedthebestconfig- (Zhang et al. 2020), all the instances we have selected are
+urationonthisuniqueinstanceforthewholegroup.Wehave benchmarkedtoo,sowehaveaddedtheirresultstoourbench-
+notperformedextrahyper-parametersearchesforDemirkol’s mark.HanandYang(2020)haveonlyselected3outof15
+instancesandusethesameoneswehaveusedforTaillard’s. oftheinstanceswehaveselected.Theseresultsareincluded
+andonlyallowforapartialcomparison.
+ModelandConfiguration
+Tohaveagoodideaaboutourapproachperformance,we
+TheactionselectionnetworkMLP andstate-valuepredic- haveincludeOR-Tools(PerronandFurnon2019)thebest
+θπ
+tionnetworkMLP donotshareanylayers.Bothnetworks toolonthemarketusedtosolveJSSproblem(DaColand
+θv
+have2hiddenlayerswithhiddendimension319andReLU Teppan2019).Wealsogivetheuppersolutionboundsfound
+asactivationfunction.ForPPO,wesettheepochsofupdat- intheliteraturetoindicatethesolution’squalities.
+ingnetworkto12,theclippingparameter(cid:15) to0.541,and
+PPO
+thecoefficientforpolicylossandvaluefunctionto0.496and Results
+0.7918.Weusedalinearschedulerforthelearningrateand
+Weconductedanumberofexperimentsonaserverwith2
+the entropy coefficient who decay linearly each parameter
+IntelXeon6138CPUandasingleNvidiaTitanXpGPU.4
+from6.861×10−4to7.783×10−5andfrom2.042×10−3
+Obtained results are presented in Table 1 which shows all
+to2.458×10−4 respectively.Wesetthediscountfactorγ
+foundsolutionsbyeachapproachforeveryinstanceofour
+to 1, and use the Adam optimizer. We do rollouts of size
+twodatasets.Asonecansee,ourapproachperformsbetter
+704,i.e.,morethanoneepisodeperiteration,andtrainwith
+than dispatching rules as it found better solutions on each
+mini-batchesofthesize33000.
+instance.Onaverage,ourmethodfindssolutions11%better
+make-span than the best MWKR dispatching rule on Tail-
+Experiments
+lard’sinstancesand12%betteronDemirkol’sone.
+Thissectionpresentsourexperimentalresultsagainstpublic These results are interesting as we have used the same
+benchmarks. hyper-parameterswehaveusedforTaillard’sinstances,and
+we have not used Demirkol’s instances during the hyper-
+BenchmarkInstances parameterssearch.However,thesetwoinstancessharesome
+Wepickedoneclassicalsetofbenchmarkinstancesprovided similarities related to the problem size (i.e., they have the
+byTaillard(1993).Thesewell-studiesinstancesareofdiffer- same number of operations to plan). It indicates that our
+entsizeswiththeupperandlowerboundsolutionprovided approachgeneralizeswell,asitexhibitssimilarperformances
+foreachinstance.3Wehaveselectedtheclassof10instances oninstancesfromdifferentdatasets.
+with30jobsand20machinesbecausetheyareconsidered Even static dispatching rules perform quite well in our
+ashard(i.e.,harderthanbiggerinstances).Theoptimalso- environment.Thiscanbeexplainedbecausetheyactgreedy
+lutionsarenotyetknown.Still,theliteratureprovidesusa (i.e.,theydonottaketheNo-Opaction).Thedispatchingis
+lowerandupperboundforeachinstance. done with regard to the currently available jobs at a given
+To assess that our environment’s performance does not time-step, not all the jobs, as it is generally the case with
+overfitTaillard’sinstance, we alsoselect another setof in- dispatchingruleswhenusingthedisjunctivegraphformula-
+stancesofDemirkol,Mehta,andUzsoy(1998).Wepicked tion.Theyalsotakeadvantageofthenon-finalprioritization
+the5instanceswith,asTaillard’sinstances,30jobsand20 rules we have implemented. Outside of our environment,
+thebestdispatchingrulesMWKRgivesanaveragesolution
+1The code is available at https://github.com/prosysscience/ make-spanof3193(Zhangetal.2020)onTaillard’sinstances
+JSSEnv comparedtothe2449wehavefound.
+2https://wandb.ai/ingambe/PPOJss/sweeps
+3http://jobshop.jjvh.nl/index.php 4Thecodeisavailableathttps://github.com/prosysscience/JSS
+
+--- PAGE 7 ---
+Table1:Make-spanofsolutionsfoundbydifferentapproachesonTaillard’sandDemirkol’sinstances.Whilewedonotachieve
+the same performance as the best tool on the market (OR-Tools), our approach performs better than dispatching rules and
+previousRLliterature.
+OR UPPER
+DATASET INSTANCE OURS FIFO MWKR (ZHANGETAL.2020) (HANANDYANG2020)
+TOOLS BOUND
+TAILLARD TA41 2208 2543 2632 2667 2450 2144 2005
+TA42 2168 2578 2401 2664 2351 2071 1937
+TA43 2086 2506 2385 2431 — 1967 1846
+TA44 2261 2555 2532 2714 — 2094 1979
+TA45 2227 2565 2431 2637 — 2032 2000
+TA46 2349 2617 2485 2776 — 2129 2004
+TA47 2101 2508 2301 2476 — 1952 1889
+TA48 2267 2541 2350 2490 — 2091 1941
+TA49 2154 2550 2474 2556 — 2089 1961
+TA50 2216 2531 2496 2628 — 2010 1923
+Average 2203 2549 2449 2604 — 2058 1948
+DEMIRKOL DMU16 4188 4934 4550 4953 4414 3903 3751
+DMU17 4274 5014 4874 5379 — 3960 3814
+DMU18 4326 4936 4792 5100 — 4073 3844
+DMU19 4195 4902 4842 4889 — 3922 3764
+DMU20 4074 4539 4500 4859 — 3913 3703
+Average 4211 4865 4712 5036 — 3954 3775
+Althoughwehavenotreachedtheperformanceofcutting Inallthreeofourcommoninstances,ourapproachoutper-
+edgeOR-ToolsCPsolverwhofoundonaveragesolutions7% formstheirs.ForthetwoTaillard’sinstancesandtheunique
+betteronTaillard’sinstancesand6%betteronDemirkol’s Demirkol’s instance, we obtain 10% and 5% better solu-
+one;thisworkfocusonlyondesigninganefficientenviron- tions,respectively.Nevertheless,theyuseddifferentRLal-
+mentandusesastandardDRLalgorithmwhocanbefurther gorithms(DuelingDoubleDQN,anoff-policy,value-based
+enhancedtotackleschedulingproblems. algorithm)withdifferentsettings.Theirtrainingislimitedto
+Wetriedtorunouralgorithmformorethan10minutes, 8000episodesandnotbyatimelimit.
+but PPO was stuck in a local minimum (i.e., the average
+solutionmake-spanandthebestoneconverge).Evenentropy ConclusionsandFutureWork
+regularizationwasnotabletopreventthisphenomenon. Inthispaper,wehavebuiltanoptimizedenvironmentand
+presentanend-to-endDRLbasedmethodtoautomatically
+ComparisonwithLiteratureResults learntodispatchjobsinatimeconstraintscenariothatmod-
+ItisoftendifficulttocomparedifferentRLapproachesasthe els industrial exigence. Our benchmark well confirms our
+goal/settings/algorithmusedaredifferent.Wewillputthese method’ssuperioritytothetraditionalfixedprioritydispatch-
+resultsinperspectiveinthissub-section. ing rules and is state-of-the-art performance with respect
+In(Zhangetal.2020),authorshavenottrainedtheiragents tothecurrentlimitedRLliterature.Thesolutionswewere
+onthebenchmarkinstancesbutonrandomlygeneratedones, able to find are close to the ones found by one of the best
+sincetheirgoalwastoobtainanagentthatgeneralizesbeyond constraintsolvers.
+the presented instances. This is a different goal than ours, Thispaperfocusesmainlyonbuildinganefficientenviron-
+whichismoretraditionalforcombinatorialproblemsasitis ment.Infuturework,weplantoimproveagentexploration
+instance-specificanddoesnotreusetheknowledgegained toavoidPPObeingstuckinalocaloptimumandexploredif-
+fromotherinstances.However,weobtainbetterresultswith ferenttransferlearningapproachestoenhanceourmethod’s
+static dispatching rules on our environment than their RL performancefurther.
+agentsappliedwithouttraining.Thisobservationhighlights
+References
+thequalityofourenvironment.Infact,ouragentsfound18%
+and20%bettersolutionsthanofZhangetal.onTaillard’sor Abadi,M.;Agarwal,A.;Barham,P.;Brevdo,E.;Chen,Z.;
+Demirkol’sinstances,respectively. Citro, C.; Corrado, G. S.; Davis, A.; Dean, J.; Devin, M.;
+The comparison with (Han and Yang 2020) is fairer as Ghemawat, S.; Goodfellow, I.; Harp, A.; Irving, G.; Isard,
+theauthorsalsotraintheiragentonthebenchmarkinstances. M.;Jia,Y.;Jozefowicz,R.;Kaiser,L.;Kudlur,M.;Levenberg,
+
+--- PAGE 8 ---
+J.;Mane´,D.;Monga,R.;Moore,S.;Murray,D.;Olah,C.; InternationalConferenceonMachineLearning,ICML2016
+Schuster,M.;Shlens,J.;Steiner,B.;Sutskever,I.;Talwar,K.; 4:2850–2869. URLhttp://arxiv.org/abs/1602.01783.
+Tucker,P.;Vanhoucke,V.;Vasudevan,V.;Vie´gas,F.;Vinyals,
+Mnih, V.; Kavukcuoglu, K.; Silver, D.; Graves, A.;
+O.; Warden, P.; Wattenberg, M.; Wicke, M.; Yu, Y.; and
+Antonoglou,I.;Wierstra,D.;andRiedmiller,M.2013. Play-
+Zheng,X.2015. TensorFlow:Large-ScaleMachineLearning
+ingAtariwithDeepReinforcementLearning. NIPSDeep
+on Heterogeneous Systems. URL https://www.tensorflow.
+Learning Workshop 2013 URL http://arxiv.org/abs/1312.
+org/. Softwareavailablefromtensorflow.org.
+5602.
+Bengio, Y.; Lodi, A.; and Prouvost, A. 2021. Machine
+learningforcombinatorialoptimization:Amethodological OpenAI.2017. ProximalPolicyOptimization—Spinning
+tourd’horizon. EuropeanJournalofOperationalResearch Updocumentation. URLhttps://spinningup.openai.com/en/
+290(2):405–421. ISSN0377-2217. doi:https://doi.org/10. latest/algorithms/ppo.html.
+1016/j.ejor.2020.07.063. URLhttp://www.sciencedirect.com/
+Perron, L.; and Furnon, V. 2019. OR-Tools. URL https:
+science/article/pii/S0377221720306895.
+//developers.google.com/optimization/.
+Biewald,L.2020. ExperimentTrackingwithWeightsand
+Schulman, J.; Levine, S.; Moritz, P.; Jordan, M. I.; and
+Biases. URLhttps://www.wandb.com/. Softwareavailable
+Abbeel,P.2015. TrustRegionPolicyOptimization. 32nd
+fromwandb.com.
+InternationalConferenceonMachineLearning,ICML2015
+Chen, Z.; and Liu, B. 2018. Lifelong machine learning. 3:1889–1897. URLhttp://arxiv.org/abs/1502.05477.
+Synthesis Lectures on Artificial Intelligence and Machine
+Learning12(3):24–25. Schulman, J.; Wolski, F.; Dhariwal, P.; Radford, A.; and
+Klimov, O. 2017. Proximal Policy Optimization Algo-
+DaCol,G.;andTeppan,E.C.2019. IndustrialSizeJobShop
+rithms. CoRR abs/1707.06347. URL http://dblp.uni-trier.
+SchedulingTackledbyPresentDayCPSolvers. InSchiex,
+de/db/journals/corr/corr1707.html#SchulmanWDRK17.
+T.; and de Givry, S., eds., Principles and Practice of Con-
+straintProgramming,144–160.Cham:SpringerInternational Silver,D.;Hubert,T.;Schrittwieser,J.;Antonoglou,I.;Lai,
+Publishing. ISBN978-3-030-30048-7. M.;Guez,A.;Lanctot,M.;Sifre,L.;Kumaran,D.;Graepel,
+T.; Lillicrap, T.; Simonyan, K.; and Hassabis, D. 2018. A
+Demirkol,E.;Mehta,S.;andUzsoy,R.1998.Benchmarksfor
+generalreinforcementlearningalgorithmthatmasterschess,
+shopschedulingproblems. EuropeanJournalofOperational
+shogi,andGothroughself-play. Science362(6419):1140–
+Research 109(1): 137 – 141. ISSN 0377-2217. doi:https:
+1144. URLhttp://arxiv.org/abs/1712.01815.
+//doi.org/10.1016/S0377-2217(97)00019-2.URLhttp://www.
+sciencedirect.com/science/article/pii/S0377221797000192. Sutton,R.S.;andBarto,A.G.2018.Reinforcementlearning:
+Han,B.A.;andYang,J.J.2020. ResearchonAdaptiveJob Anintroduction,321–338. MITpress.
+ShopSchedulingProblemsBasedonDuelingDoubleDQN.
+Taillard,E.1993.Benchmarksforbasicschedulingproblems.
+IEEEAccess8:186474–186495.doi:10.1109/ACCESS.2020.
+EuropeanJournalofOperationalResearch64:278–285.
+3029868.
+Vinyals,O.;Babuschkin,I.;Czarnecki,W.M.;Mathieu,M.;
+Huang,S.;andOntan˜o´n,S.2020. ACloserLookatInvalid
+Dudzik, A.; Chung, J.; Choi, D. H.; Powell, R.; Ewalds,
+Action Masking in Policy Gradient Algorithms. Preprint
+T.;Georgiev,P.;Oh,J.;Horgan,D.;Kroiss,M.;Danihelka,
+URLhttp://arxiv.org/abs/2006.14171.
+I.; Huang, A.; Sifre, L.; Cai, T.; Agapiou, J. P.; Jaderberg,
+J.F. Muth, G. T. 1966. Industrial Scheduling. Lou-
+M.; Vezhnevets, A. S.; Leblond, R.; Pohlen, T.; Dalibard,
+vain Economic Review 32(2): 121–122. doi:10.1017/
+V.; Budden, D.; Sulsky, Y.; Molloy, J.; Paine, T. L.; Gul-
+S0770451800056682.
+cehre,C.;Wang,Z.;Pfaff,T.;Wu,Y.;Ring,R.;Yogatama,
+Liang,E.;Liaw,R.;Nishihara,R.;Moritz,P.;Fox,R.;Gold- D.;Wu¨nsch,D.;McKinney,K.;Smith,O.;Schaul,T.;Lil-
+berg,K.;Gonzalez,J.E.;Jordan,M.I.;andStoica,I.2018. licrap, T.; Kavukcuoglu, K.; Hassabis, D.; Apps, C.; and
+RLlib:AbstractionsforDistributedReinforcementLearning. Silver, D. 2019. Grandmaster level in StarCraft II using
+InInternationalConferenceonMachineLearning(ICML). multi-agentreinforcementlearning. Nature575:350–354.
+ISSN 14764687. doi:10.1038/s41586-019-1724-z. URL
+Lin,C.-C.;Deng,D.-J.;Chih,Y.-L.;andChiu,H.-T.2019.
+https://doi.org/10.1038/s41586-019-1724-z.
+SmartManufacturingSchedulingWithEdgeComputingUs-
+ing Multiclass Deep Q Network. IEEE Transactions on Waschneck,B.;Reichstaller,A.;Belzner,L.;Altenmu¨ller,T.;
+IndustrialInformatics15:4276–4284. doi:10.1109/TII.2019. Bauernhansl,T.;Knapp,A.;andKyek,A.2018.Optimization
+2908210. of global production scheduling with deep reinforcement
+Liu,C.L.;Chang,C.C.;andTseng,C.J.2020. Actor-critic learning. ProcediaCIRP72:1264–1269. ISSN22128271.
+deepreinforcementlearningforsolvingjobshopscheduling doi:10.1016/j.procir.2018.03.212.
+problems. IEEEAccess8:71752–71762. ISSN21693536.
+Williams,R.J.1992. Simplestatisticalgradient-following
+doi:10.1109/ACCESS.2020.2987820.
+algorithms for connectionist reinforcement learning. Ma-
+Mnih,V.;Badia,A.P.;Mirza,M.;Graves,A.;Lillicrap,T.P.; chineLearning8:229–256. ISSN0885-6125. doi:10.1007/
+Harley, T.; Silver, D.; and Kavukcuoglu, K. 2016. Asyn- bf00992696. URLhttps://link.springer.com/article/10.1007/
+chronousMethodsforDeepReinforcementLearning. 33rd BF00992696.
+
+--- PAGE 9 ---
+Zhang,C.;Song,W.;Cao,Z.;Zhang,J.;Tan,P.S.;andXu,
+C.2020. LearningtoDispatchforJobShopSchedulingvia
+DeepReinforcementLearning.
