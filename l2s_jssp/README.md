@@ -1,53 +1,126 @@
-# L2S for Job-Shop Scheduling — Colab project
+# L2S + TBGAT for Job-Shop Scheduling
 
-A compact, from-scratch **PyTorch** re-implementation of the *Learning-to-Search* (L2S)
-improvement heuristic for the Job-Shop Scheduling Problem (JSSP), packaged as a
-**Google Colab notebook** you can run cell by cell.
+A self-contained **PyTorch + PyG (torch_geometric)** implementation of the L2S improvement-heuristic framework enhanced with TBGAT-style bidirectional multi-head graph attention for solving the Job-Shop Scheduling Problem (JSSP).
 
-> Reference: Cong Zhang et al., *Deep Reinforcement Learning Guided Improvement Heuristic
-> for Job Shop Scheduling*, ICLR 2024.
+## References
+
+- **L2S**: Cong Zhang et al., *Deep Reinforcement Learning Guided Improvement Heuristic for Job Shop Scheduling*, ICLR 2024
+- **TBGAT**: Cong Zhang et al., *Learning Topological Representations with Bidirectional Graph Attention Network for Solving Job Shop Scheduling Problem*, UAI 2024
 
 ## Files
 
 | File | Purpose |
 |------|---------|
-| `L2S_JSSP_Colab.ipynb` | **Main deliverable.** 16 cells: data → graph/CPM → N5 → env → GIN+GAT policy → n-step REINFORCE → train → evaluate → Gantt. Open in Colab and Run-All. |
-| `build_notebook.py` | Generator that produces the `.ipynb` (edit here, then `python3 build_notebook.py`). |
-| `_validate_core.py` | Pure-Python (no deps) check of the algorithmic core: confirms the message-passing EST evaluator equals CPM, and that N5 local search reduces makespan. |
+| `L2S_TBGAT_Colab_v2.ipynb` | **Main notebook.** 21 cells: install PyG -> data -> graph/CPM/MPTS -> N5 -> env -> TBGAT policy (FEM+BEM) -> n-step REINFORCE -> train -> benchmark eval -> Gantt. Open in Colab and Run All. |
+| `L2S_JSSP_Colab.ipynb` | v1 notebook (dense adjacency, GIN+GAT, smaller defaults). Kept for reference. |
+| `build_notebook.py` | v1 notebook generator. |
+| `build_v2_notebook.py` | v2 notebook generator (edit here, then `python3 build_v2_notebook.py`). |
+| `_validate_core.py` | Pure-Python validation of the algorithmic core (no deps). |
 
-## How to use
+## Quick Start
 
-1. Upload `L2S_JSSP_Colab.ipynb` to [Google Colab](https://colab.research.google.com/)
-   (or `File → Open notebook → GitHub`).
-2. (Optional) `Runtime → Change runtime type → GPU`.
-3. `Runtime → Run all`. Training on the default 6×6 setting takes a few minutes.
+1. Upload `L2S_TBGAT_Colab_v2.ipynb` to [Google Colab](https://colab.research.google.com/)
+2. **Runtime -> Change runtime type -> T4 GPU**
+3. **Runtime -> Run all** (Ctrl+F9)
+4. Cell 1 installs `torch_geometric` (~60s)
+5. Training on default 10x10 config takes ~10-15 min on T4
 
-No `pip install` needed — it uses only `torch`, `numpy`, `matplotlib`, all pre-installed on Colab.
+No manual `pip install` needed beyond what Cell 1 does automatically.
 
-## How the L2S pillars map to the notebook
+## Architecture (v2)
 
-| L2S pillar | Where |
-|------------|-------|
-| Local-search loop | `Environment` (Cell 8) |
-| N5 neighbourhood (critical blocks) | Cell 6 |
-| Graph embedding: GIN (TPM) + GAT (CAM) | Cell 10 |
-| MDP (state = complete-solution graph, reward = step improvement) | Cell 8 |
-| Message-passing schedule evaluator (EST/LST) | Cell 5 |
-| n-step REINFORCE | Cell 12 |
+Implements TBGAT (Fig. 5 of the paper):
 
-## Scaling toward the paper
+```
+                    Forward view of DG
+                          |
+                    [FEM: 3-layer GATv2, 4 heads]
+                    input: (p, EST, fwd_topo_sort)
+                          |
+        h_fwd -----+-----+
+                    |
+                [Concatenate]  -->  h_x = [h_fwd || h_bwd]
+                    |
+        h_bwd -----+-----+
+                          |
+                    [BEM: 3-layer GATv2, 4 heads]
+                    input: (p, LST, bwd_topo_sort)
+                          |
+                    Backward view of DG
 
-Edit the `Config` in Cell 13:
+        h_G = mean_pool(h_x)
 
-```python
-cfg = Config(n_jobs=10, n_machines=10,
-             embed_dim=128, gin_hidden=128, gat_hidden=128, n_layers=4,
-             horizon_T=500, n_step=10, batch_size=64,
-             lr=5e-5, n_iterations=2000)
+        For each N5 candidate pair (u,v):
+            score = MLP([h_u || h_v || h_G])
+
+        Action ~ Categorical(scores)
 ```
 
-## Deliberate simplifications (for a runnable prototype)
+### Key components mapped to the notebook
 
-- Dense adjacency matrices instead of `torch_geometric` sparse ops (ideal for small/medium `N`).
-- Smaller default network + horizon so it trains in minutes; bump up as above.
-- Added a mean-return baseline and a small entropy bonus for training stability.
+| L2S/TBGAT Component | Notebook Cell |
+|---------------------|---------------|
+| JSSP instance + parsers + TBGAT `.npy` loader | Cell 4 |
+| Disjunctive graph + CPM (EST/LST) | Cell 5 |
+| MPTS (Message-Passing Topological Sort) | Cell 5 |
+| Critical path + N5 neighbourhood | Cell 6 |
+| FDD/MWKR initial solution | Cell 7 |
+| MDP Environment | Cell 8 |
+| TBGAT Policy (FEM + BEM + Action MLP) | Cell 9 |
+| n-step REINFORCE + entropy regularization | Cell 11 |
+| Training loop | Cell 12 |
+| Benchmark evaluation (FT/LA/Taillard) | Cells 16-17 |
+| Gantt chart visualization | Cell 18 |
+
+## Benchmark Evaluation
+
+The notebook evaluates on classic JSSP benchmarks from the [TBGAT repo](https://github.com/zcaicaros/TBGAT):
+
+- **FT** (Fisher & Thompson): 6x6, 10x10
+- **LA** (Lawrence): 10x5, 15x5, 20x5, 10x10
+- **Taillard**: 15x15
+- **Synthetic**: 10x10
+
+Cell 16 auto-downloads `.npy` benchmark files. Results are compared against best-known optimal solutions.
+
+## Default Configuration (feasible on Colab T4)
+
+```python
+Config(
+    n_jobs=10, n_machines=10,       # problem size
+    embed_dim=128, n_heads=4,       # TBGAT architecture
+    n_layers=3, act_n_layers=4,
+    horizon_T=200, n_step=10,       # RL
+    batch_size=32, n_iterations=300,
+    lr=3e-5, entropy_coef=1e-5,
+    eval_steps=500,
+)
+```
+
+### Scaling toward paper results
+
+```python
+cfg = Config(
+    n_jobs=15, n_machines=15,
+    embed_dim=128, n_heads=4, n_layers=3,
+    horizon_T=500, n_step=10,
+    batch_size=64, n_iterations=2000,
+    lr=1e-5, entropy_coef=1e-5,
+    eval_steps=5000,
+)
+```
+
+## Improvements over v1
+
+| # | Aspect | v1 | v2 |
+|---|--------|----|----|
+| 1 | Default size | 6x6, embed=64 | 10x10, embed=128 |
+| 2 | GNN | Dense GIN+GAT (single-head) | Sparse multi-head GATv2 via PyG |
+| 3 | Architecture | L2S (GIN TPM + GAT CAM) | TBGAT (FEM + BEM, bidirectional) |
+| 4 | Features | (p, est, lst) | Forward: (p, est, fwd_topo), Backward: (p, lst, bwd_topo) |
+| 5 | Evaluation | vs. random search | vs. FDD/MWKR + best-known optima on FT/LA/Taillard |
+| 6 | Training | REINFORCE + baseline | Entropy-regularized REINFORCE (Algorithm 1, TBGAT) |
+
+## License
+
+MIT
